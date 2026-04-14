@@ -1,5 +1,5 @@
 appId: com.openclaw.installer
-productName: OpenClaw安装向导
+productName: OpenClaw-Installer
 copyright: Copyright 2026 OpenClaw
 
 directories:
@@ -30,11 +30,12 @@ mac:
   target:
     - target: dmg
       arch: [x64, arm64]
-  icon: build/icon.icns
+  icon: build/icon.png
   category: public.app-category.developer-tools
-  hardenedRuntime: true
+  hardenedRuntime: false
+  identity: null
 dmg:
-  title: "${productName} ${version}"
+  title: "OpenClaw Installer ${version}"
   contents:
     - x: 130
       y: 220
@@ -47,3 +48,5 @@ asar: true
 asarUnpack:
   - scripts/**
   - node_modules/sudo-prompt/**
+
+forceCodeSigning: false
