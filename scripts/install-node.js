@@ -6,7 +6,7 @@ const os = require('os');
 const https = require('https');
 const logger = require('./logger');
 
-const NODE_VERSION = '22.14.0';
+const NODE_VERSION = '22.22.2';
 const NODE_BASE_URL = `https://nodejs.org/dist/v${NODE_VERSION}/`;
 
 function getDownloadInfo(platform, arch) {
@@ -15,13 +15,16 @@ function getDownloadInfo(platform, arch) {
     return {
       url: `${NODE_BASE_URL}node-v${NODE_VERSION}-${realArch}.msi`,
       filename: `node-v${NODE_VERSION}-${realArch}.msi`,
+      type: 'msi',
     };
   }
   if (platform === 'darwin') {
-    const suffix = arch === 'arm64' ? '-arm64' : '-x64';
+    // macOS: 只有 tar.gz，没有 pkg
+    const suffix = arch === 'arm64' ? 'darwin-arm64' : 'darwin-x64';
     return {
-      url: `${NODE_BASE_URL}node-v${NODE_VERSION}${suffix}.pkg`,
-      filename: `node-v${NODE_VERSION}${suffix}.pkg`,
+      url: `${NODE_BASE_URL}node-v${NODE_VERSION}-${suffix}.tar.gz`,
+      filename: `node-v${NODE_VERSION}-${suffix}.tar.gz`,
+      type: 'tar',
     };
   }
   throw new Error(`不支持的平台: ${platform}`);
@@ -94,7 +97,12 @@ async function installNode(win) {
   if (process.platform === 'win32') {
     await installWindowsMsi(destPath, win);
   } else if (process.platform === 'darwin') {
-    await installMacPkg(destPath, win);
+    const info = getDownloadInfo(process.platform, process.arch);
+    if (info.type === 'tar') {
+      await installMacTarball(destPath, win);
+    } else {
+      await installMacPkg(destPath, win);
+    }
   }
 
   // 刷新 PATH
@@ -193,6 +201,31 @@ function installWindowsMsi(msiPath, win) {
       logger.error(`msiexec 执行错误: ${err.message}`);
       reject(new Error(`无法执行安装程序: ${err.message}`));
     });
+  });
+}
+
+function installMacTarball(tarPath, win) {
+  return new Promise((resolve, reject) => {
+    logger.info('执行 macOS tar.gz 安装...');
+
+    try {
+      const sudo = require('sudo-prompt');
+      const options = { name: 'OpenClaw 安装向导' };
+      // 解压到 /usr/local，Node.js tarball 内部自带 node-v22.x.x-darwin-xxx 目录结构
+      const cmd = `tar -xzf "${tarPath}" -C /usr/local --strip-components=1`;
+      sudo.exec(cmd, options, (error, stdout, stderr) => {
+        if (error) {
+          logger.error(`macOS tar.gz 安装失败: ${error.message}`);
+          reject(new Error(`Node.js 安装失败: ${error.message}\n请尝试手动在终端执行:\nsudo tar -xzf "${tarPath}" -C /usr/local --strip-components=1`));
+        } else {
+          logger.info('macOS tar.gz 安装成功');
+          resolve();
+        }
+      });
+    } catch (err) {
+      logger.error(`sudo-prompt 加载失败: ${err.message}`);
+      reject(new Error(`需要管理员权限安装 Node.js。\n请在终端执行:\nsudo tar -xzf "${tarPath}" -C /usr/local --strip-components=1`));
+    }
   });
 }
 

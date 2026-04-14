@@ -91,14 +91,13 @@ async function runTests() {
     const https = require('https');
     let url;
     if (process.platform === 'win32') {
-      url = 'https://nodejs.org/dist/v22.14.0/node-v22.14.0-x64.msi';
+      url = 'https://nodejs.org/dist/v22.22.2/node-v22.22.2-x64.msi';
     } else if (process.platform === 'darwin') {
-      // macOS: darwin-arm64 或 darwin-x64
+      // macOS: 只有 tar.gz 格式
       const arch = process.arch === 'arm64' ? 'darwin-arm64' : 'darwin-x64';
-      url = `https://nodejs.org/dist/v22.14.0/node-v22.14.0-${arch}.pkg`;
+      url = `https://nodejs.org/dist/v22.22.2/node-v22.22.2-${arch}.tar.gz`;
     } else {
-      // Linux 等其他平台用 tar.gz
-      url = `https://nodejs.org/dist/v22.14.0/node-v22.14.0-${process.platform}-${process.arch}.tar.gz`;
+      url = `https://nodejs.org/dist/v22.22.2/node-v22.22.2-${process.platform}-${process.arch}.tar.gz`;
     }
 
     await new Promise((resolve, reject) => {
