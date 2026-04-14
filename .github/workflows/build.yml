@@ -1,0 +1,108 @@
+name: 构建和测试 OpenClaw 安装器
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  # ===== 第一步: 所有平台运行自动化测试 =====
+  test:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, macos-13]
+        # windows-latest = Win11/Server
+        # macos-latest = macOS M芯片 (arm64)
+        # macos-13 = macOS Intel (x64)
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 安装依赖
+        run: npm install
+
+      - name: 运行自动化测试
+        run: npm test
+
+  # ===== 第二步: 打包安装包 =====
+  build:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            build_cmd: npm run build:win
+            artifact: windows-installer
+          - os: macos-latest
+            build_cmd: npm run build:mac
+            artifact: macos-arm64-installer
+          - os: macos-13
+            build_cmd: npm run build:mac
+            artifact: macos-x64-installer
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 安装依赖
+        run: npm install
+
+      - name: 打包安装包
+        run: ${{ matrix.build_cmd }}
+
+      - name: 上传安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+          retention-days: 30
+
+  # ===== 第三步: 在干净环境验证安装包 =====
+  verify:
+    needs: build
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: windows-installer
+          - os: macos-latest
+            artifact: macos-arm64-installer
+          - os: macos-13
+            artifact: macos-x64-installer
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 下载安装包
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/
+
+      - name: 验证安装包文件存在
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            ls -lh dist/*.exe
+            echo "Windows 安装包大小: $(du -h dist/*.exe | cut -f1)"
+          else
+            ls -lh dist/*.dmg
+            echo "macOS 安装包大小: $(du -h dist/*.dmg | cut -f1)"
+          fi
+
+      - name: 在 CI 环境验证模块功能
+        run: |
+          npm install
+          npm test

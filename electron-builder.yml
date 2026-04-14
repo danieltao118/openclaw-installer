@@ -1,0 +1,49 @@
+appId: com.openclaw.installer
+productName: OpenClaw安装向导
+copyright: Copyright 2026 OpenClaw
+
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - main.js
+  - preload.js
+  - src/**/*
+  - scripts/**/*
+  - node_modules/**/*
+  - build/icon.*
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  requestedExecutionLevel: requireAdministrator
+nsis:
+  oneClick: true
+  perMachine: true
+  deleteAppDataOnUninstall: false
+  artifactName: openclaw-setup.exe
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  icon: build/icon.icns
+  category: public.app-category.developer-tools
+  hardenedRuntime: true
+dmg:
+  title: "${productName} ${version}"
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+asar: true
+asarUnpack:
+  - scripts/**
+  - node_modules/sudo-prompt/**

@@ -1,0 +1,510 @@
+:root {
+  --primary: #4A90D9;
+  --primary-hover: #357ABD;
+  --success: #52C41A;
+  --error: #FF4D4F;
+  --warning: #FAAD14;
+  --bg: #F5F7FA;
+  --card-bg: #FFFFFF;
+  --text: #333333;
+  --text-secondary: #666666;
+  --border: #E8E8E8;
+  --radius: 12px;
+  --font: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
+  --mono: "Cascadia Code", "Fira Code", "Consolas", monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  height: 100vh;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* 顶部进度条 */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.progress-track {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), #6DB3F2);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* 步骤容器 */
+.step {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.step.active {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* 卡片 */
+.card {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 32px;
+  width: 100%;
+  max-width: 600px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.center-card {
+  text-align: center;
+  margin-top: 40px;
+}
+
+.card h1 {
+  font-size: 24px;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.card h2 {
+  font-size: 18px;
+  margin-bottom: 16px;
+  color: var(--text);
+}
+
+.card h3 {
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+
+/* 欢迎页 */
+.logo {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+
+.version {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+
+.desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+
+/* 按钮 */
+.btn {
+  padding: 10px 32px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.btn-secondary {
+  background: var(--bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--border);
+}
+
+.btn-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+/* 环境检测 */
+.detect-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.detect-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg);
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.detect-item .icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.detect-item .label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.detect-item .value {
+  font-weight: 500;
+}
+
+.detect-summary {
+  padding: 12px 16px;
+  background: #F0F7FF;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--primary);
+  margin-bottom: 4px;
+  line-height: 1.6;
+}
+
+/* 安装进度 */
+.install-progress-bar {
+  width: 100%;
+  height: 10px;
+  background: var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.install-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), #6DB3F2);
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
+
+.install-percent {
+  display: block;
+  text-align: right;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.step-list {
+  list-style: none;
+  margin-bottom: 16px;
+}
+
+.step-item {
+  padding: 8px 12px;
+  font-size: 14px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  transition: background 0.2s;
+}
+
+.step-item::before {
+  content: '○';
+  color: var(--text-secondary);
+  font-size: 16px;
+}
+
+.step-item.active {
+  background: #F0F7FF;
+  font-weight: 500;
+}
+
+.step-item.active::before {
+  content: '◉';
+  color: var(--primary);
+}
+
+.step-item.done {
+  color: var(--success);
+}
+
+.step-item.done::before {
+  content: '✓';
+  color: var(--success);
+}
+
+.step-item.error {
+  color: var(--error);
+}
+
+.step-item.error::before {
+  content: '✗';
+  color: var(--error);
+}
+
+/* 日志控制台 */
+.log-details {
+  margin-top: 12px;
+}
+
+.log-details summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 8px 0;
+}
+
+.log-console {
+  background: #1E1E1E;
+  color: #D4D4D4;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 12px;
+  border-radius: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* 完成 */
+.success-icon {
+  font-size: 56px;
+  margin-bottom: 16px;
+}
+
+.success-version {
+  font-size: 15px;
+  color: var(--success);
+  margin-bottom: 24px;
+}
+
+.next-steps {
+  text-align: left;
+  background: var(--bg);
+  padding: 16px 20px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.next-steps ol {
+  padding-left: 20px;
+  margin-top: 8px;
+}
+
+.next-steps li {
+  font-size: 14px;
+  line-height: 2;
+}
+
+.next-steps code {
+  background: var(--primary);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+/* 错误 */
+.error-icon {
+  font-size: 56px;
+  margin-bottom: 16px;
+}
+
+.error-message {
+  font-size: 15px;
+  color: var(--error);
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.error-log {
+  text-align: left;
+  margin-bottom: 8px;
+}
+
+/* ========== 配置向导 ========== */
+.config-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.config-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--border);
+}
+
+.config-tab {
+  padding: 10px 20px;
+  border: none;
+  background: none;
+  font-size: 14px;
+  font-family: var(--font);
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s;
+}
+
+.config-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 500;
+}
+
+.config-tab:hover:not(.active) {
+  color: var(--text);
+}
+
+.config-panel {
+  display: none;
+}
+
+.config-panel.active {
+  display: block;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.form-input, .form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: var(--font);
+  background: var(--card-bg);
+  color: var(--text);
+  transition: border-color 0.2s;
+}
+
+.form-input:focus, .form-group select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.15);
+}
+
+.form-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.test-result {
+  display: inline-block;
+  margin-left: 12px;
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+.test-result.ok { color: var(--success); }
+.test-result.fail { color: var(--error); }
+
+.channel-info {
+  background: var(--bg);
+  padding: 16px 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  line-height: 1.8;
+}
+
+.channel-info h3 {
+  margin-bottom: 8px;
+}
+
+.channel-info p {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.code-block {
+  background: #1E1E1E;
+  color: #D4D4D4;
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  margin: 8px 0;
+  user-select: all;
+}
+
+.center-content {
+  text-align: center;
+}
+
+.config-final-msg {
+  font-size: 15px;
+  color: var(--success);
+  margin-bottom: 20px;
+}

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenClaw 安装向导</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 顶部进度条 -->
+    <div class="top-bar">
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+      </div>
+      <span class="progress-text" id="progress-text">准备就绪</span>
+    </div>
+
+    <!-- 步骤1: 欢迎 -->
+    <div id="step-welcome" class="step active">
+      <div class="card center-card">
+        <div class="logo">🦞</div>
+        <h1>OpenClaw 一键安装器</h1>
+        <p class="subtitle">教培AI实战营 · 专属工具</p>
+        <p class="version">版本 1.0.0</p>
+        <p class="desc">本程序将帮助您自动安装 Node.js 运行环境和 OpenClaw 工具。<br>安装过程约需 3-5 分钟，请保持网络连接。</p>
+        <button class="btn btn-primary" id="btn-start">开始安装</button>
+      </div>
+    </div>
+
+    <!-- 步骤2: 环境检测 -->
+    <div id="step-detect" class="step">
+      <div class="card">
+        <h2>环境检测</h2>
+        <div class="detect-grid" id="detect-results">
+          <!-- JS 动态填充 -->
+        </div>
+        <div class="detect-summary" id="detect-summary"></div>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="btn-back-welcome">返回</button>
+          <button class="btn btn-primary" id="btn-go-install">开始安装 →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 步骤3: 安装中 -->
+    <div id="step-install" class="step">
+      <div class="card">
+        <h2 id="install-title">正在安装...</h2>
+        <div class="install-progress-bar">
+          <div class="install-progress-fill" id="install-progress-fill" style="width: 0%"></div>
+        </div>
+        <span class="install-percent" id="install-percent">0%</span>
+        <ul class="step-list" id="step-list">
+          <li id="istep-detect" class="step-item pending">检测系统环境</li>
+          <li id="istep-download-node" class="step-item pending">下载 Node.js v22</li>
+          <li id="istep-install-node" class="step-item pending">安装 Node.js</li>
+          <li id="istep-mirror" class="step-item pending">配置 npm 镜像源</li>
+          <li id="istep-install-openclaw" class="step-item pending">下载并安装 OpenClaw</li>
+          <li id="istep-verify" class="step-item pending">验证安装</li>
+        </ul>
+        <!-- 可折叠日志 -->
+        <details class="log-details">
+          <summary>查看详细日志</summary>
+          <div class="log-console" id="log-console"></div>
+        </details>
+      </div>
+    </div>
+
+    <!-- 步骤4: 配置向导 -->
+    <div id="step-config" class="step">
+      <div class="card">
+        <h2>🛠️ 初始配置</h2>
+        <p class="config-desc">安装成功！接下来进行基础配置，让您快速上手 OpenClaw。</p>
+
+        <!-- 配置步骤导航 -->
+        <div class="config-tabs">
+          <button class="config-tab active" data-tab="tab-model">AI模型</button>
+          <button class="config-tab" data-tab="tab-channel">飞书通道</button>
+          <button class="config-tab" data-tab="tab-done">完成</button>
+        </div>
+
+        <!-- Tab: AI模型配置 -->
+        <div id="tab-model" class="config-panel active">
+          <div class="form-group">
+            <label>选择 AI 模型提供商</label>
+            <select id="cfg-provider">
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openai">OpenAI (GPT)</option>
+              <option value="zhipu">智谱AI (GLM)</option>
+              <option value="deepseek">DeepSeek</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>API Key</label>
+            <input type="password" id="cfg-apikey" placeholder="输入您的 API Key" class="form-input">
+            <span class="form-hint" id="cfg-key-hint">可在对应平台官网获取 API Key</span>
+          </div>
+          <div class="form-group">
+            <label>API 地址（可选，使用自定义接口地址时填写）</label>
+            <input type="text" id="cfg-baseurl" placeholder="留空使用默认地址" class="form-input">
+          </div>
+          <div class="form-group">
+            <label>默认模型</label>
+            <select id="cfg-model">
+              <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (推荐)</option>
+              <option value="claude-haiku-4-5">Claude Haiku 4.5 (更快)</option>
+              <option value="gpt-4o">GPT-4o</option>
+              <option value="gpt-4o-mini">GPT-4o Mini</option>
+              <option value="glm-4-plus">GLM-4 Plus</option>
+              <option value="deepseek-chat">DeepSeek Chat</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="btn-test-api">测试连接</button>
+          <span class="test-result" id="test-api-result"></span>
+          <div class="btn-row">
+            <button class="btn btn-secondary" id="btn-skip-config">跳过配置</button>
+            <button class="btn btn-primary" id="btn-save-model">保存并下一步 →</button>
+          </div>
+        </div>
+
+        <!-- Tab: 飞书通道 -->
+        <div id="tab-channel" class="config-panel">
+          <div class="channel-info">
+            <h3>📱 连接飞书通道</h3>
+            <p>OpenClaw 可以通过飞书接收和回复消息。安装完成后，在终端运行以下命令连接：</p>
+            <div class="code-block">openclaw channels add feishu</div>
+            <p class="form-hint" style="margin-top:12px">按照提示输入飞书机器人凭证即可完成连接。</p>
+            <p>也可以在下方预先填写飞书 App 信息：</p>
+          </div>
+          <div class="form-group">
+            <label>飞书 App ID</label>
+            <input type="text" id="cfg-feishu-appid" placeholder="cli_xxxxxxxxxxxx" class="form-input">
+          </div>
+          <div class="form-group">
+            <label>飞书 App Secret</label>
+            <input type="password" id="cfg-feishu-secret" placeholder="输入飞书 App Secret" class="form-input">
+          </div>
+          <div class="btn-row">
+            <button class="btn btn-secondary" id="btn-back-model">← 返回</button>
+            <button class="btn btn-primary" id="btn-save-channel">保存并完成 →</button>
+          </div>
+        </div>
+
+        <!-- Tab: 完成 -->
+        <div id="tab-done" class="config-panel">
+          <div class="center-content">
+            <div class="success-icon">🎉</div>
+            <h2>全部配置完成！</h2>
+            <p class="config-final-msg" id="config-final-msg">OpenClaw 已准备就绪</p>
+            <div class="next-steps">
+              <h3>📖 快速上手指南：</h3>
+              <ol>
+                <li>打开终端 / 命令行</li>
+                <li>输入 <code>openclaw gateway start</code> 启动服务</li>
+                <li>在飞书中找到您的机器人，发送消息测试</li>
+              </ol>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-secondary" id="btn-open-log3">查看日志</button>
+              <button class="btn btn-primary" id="btn-launch">启动 OpenClaw</button>
+              <button class="btn btn-secondary" id="btn-close">关闭安装器</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 错误页面 -->
+    <div id="step-error" class="step">
+      <div class="card center-card">
+        <div class="error-icon">❌</div>
+        <h1>安装失败</h1>
+        <p class="error-message" id="error-message"></p>
+        <details class="log-details error-log">
+          <summary>查看错误详情</summary>
+          <div class="log-console" id="error-detail"></div>
+        </details>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="btn-open-log2">查看日志文件</button>
+          <button class="btn btn-primary" id="btn-retry">重新安装</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
