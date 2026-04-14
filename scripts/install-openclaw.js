@@ -1,5 +1,6 @@
 // scripts/install-openclaw.js — 通过 npm 安装 OpenClaw（带重试）
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
+const path = require('path');
 const logger = require('./logger');
 
 const NPM_MIRROR = 'https://registry.npmmirror.com';
@@ -7,9 +8,6 @@ const MAX_RETRIES = 3;
 
 async function installOpenclaw(win) {
   logger.info('开始安装 OpenClaw...');
-
-  // Windows 下 npm 命令是 npm.cmd
-  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
   let lastError = null;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -20,7 +18,7 @@ async function installOpenclaw(win) {
           message: `安装失败，正在重试 (${attempt}/${MAX_RETRIES})...`,
         });
       }
-      await runNpmInstall(npmCmd, win);
+      await runNpmInstall(win);
       logger.info('OpenClaw 安装成功');
       return { success: true };
     } catch (err) {
@@ -35,10 +33,33 @@ async function installOpenclaw(win) {
   throw new Error(`OpenClaw 安装失败（已重试 ${MAX_RETRIES} 次）。\n${lastError.message}\n\n请尝试手动执行:\nnpm install -g openclaw --registry=${NPM_MIRROR}`);
 }
 
-function runNpmInstall(npmCmd, win) {
+function getNpmPath() {
+  if (process.platform !== 'win32') return 'npm';
+  // Windows: 查找 npm.cmd 的完整路径
+  try {
+    const npmPath = execSync('where npm.cmd', { encoding: 'utf8', timeout: 5000 }).split('\n')[0].trim();
+    if (npmPath) return npmPath;
+  } catch {}
+  // 回退：尝试常见路径
+  const candidates = [
+    path.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs', 'npm.cmd'),
+    path.join(process.env.LOCALAPPDATA || '', 'Programs', 'nodejs', 'npm.cmd'),
+  ];
+  for (const c of candidates) {
+    try {
+      require('fs').accessSync(c);
+      return c;
+    } catch {}
+  }
+  return 'npm.cmd';
+}
+
+function runNpmInstall(win) {
   return new Promise((resolve, reject) => {
-    const child = spawn(npmCmd, [
-      'install', '-g', 'openclaw',
+    const npmPath = getNpmPath();
+    logger.info(`npm 路径: ${npmPath}`);
+
+    const child = spawn('cmd', ['/c', npmPath, 'install', '-g', 'openclaw',
       `--registry=${NPM_MIRROR}`,
       '--prefer-online',
       '--no-audit',
@@ -46,6 +67,7 @@ function runNpmInstall(npmCmd, win) {
     ], {
       stdio: 'pipe',
       env: { ...process.env },
+      windowsHide: true,
     });
 
     let stdout = '';
@@ -66,7 +88,6 @@ function runNpmInstall(npmCmd, win) {
     child.stderr.on('data', (data) => {
       const text = data.toString();
       stderr += text;
-      // npm 的进度输出在 stderr，不一定是错误
       logger.info(`[npm stderr] ${text.trim()}`);
 
       if (win && !win.isDestroyed()) {
@@ -85,13 +106,7 @@ function runNpmInstall(npmCmd, win) {
     });
 
     child.on('error', (err) => {
-      if (process.platform === 'win32') {
-        // 尝试直接路径
-        const nodeDir = 'C:\\Program Files\\nodejs';
-        reject(new Error(`找不到 npm 命令。Node.js 可能未正确安装。\n请确认 ${nodeDir} 目录存在后重试。`));
-      } else {
-        reject(new Error(`无法执行 npm: ${err.message}`));
-      }
+      reject(new Error(`无法执行 npm: ${err.message}\n请确认 Node.js 已正确安装。`));
     });
   });
 }

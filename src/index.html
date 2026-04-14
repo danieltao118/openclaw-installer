@@ -85,31 +85,33 @@
           <div class="form-group">
             <label>选择 AI 模型提供商</label>
             <select id="cfg-provider">
-              <option value="anthropic">Anthropic (Claude)</option>
-              <option value="openai">OpenAI (GPT)</option>
               <option value="zhipu">智谱AI (GLM)</option>
-              <option value="deepseek">DeepSeek</option>
+              <option value="qwen">阿里云百炼 (通义千问)</option>
+              <option value="kimi">Kimi (月之暗面)</option>
+              <option value="minimax">MiniMax</option>
+              <option value="stepfun">阶跃星辰 (Step)</option>
+              <option value="custom">通用 (OpenAI 兼容协议)</option>
             </select>
+            <span class="form-hint" id="cfg-provider-hint">大多数国内供应商使用 OpenAI Completions 兼容协议</span>
           </div>
-          <div class="form-group">
+          <div class="form-group" id="group-apikey">
             <label>API Key</label>
             <input type="password" id="cfg-apikey" placeholder="输入您的 API Key" class="form-input">
-            <span class="form-hint" id="cfg-key-hint">可在对应平台官网获取 API Key</span>
+            <div class="key-hint-row">
+              <span class="form-hint" id="cfg-key-hint">在 open.bigmodel.cn 获取 API Key</span>
+              <a id="cfg-key-link" href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank" class="btn btn-link">获取 API Key →</a>
+            </div>
+          </div>
+          <div class="form-group" id="group-baseurl">
+            <label>API 地址</label>
+            <input type="text" id="cfg-baseurl" placeholder="" class="form-input">
+            <span class="form-hint">留空使用默认地址，通用模式需填写完整的 API 地址</span>
           </div>
           <div class="form-group">
-            <label>API 地址（可选，使用自定义接口地址时填写）</label>
-            <input type="text" id="cfg-baseurl" placeholder="留空使用默认地址" class="form-input">
-          </div>
-          <div class="form-group">
-            <label>默认模型</label>
-            <select id="cfg-model">
-              <option value="claude-sonnet-4-6">Claude Sonnet 4.6 (推荐)</option>
-              <option value="claude-haiku-4-5">Claude Haiku 4.5 (更快)</option>
-              <option value="gpt-4o">GPT-4o</option>
-              <option value="gpt-4o-mini">GPT-4o Mini</option>
-              <option value="glm-4-plus">GLM-4 Plus</option>
-              <option value="deepseek-chat">DeepSeek Chat</option>
-            </select>
+            <label>模型 ID</label>
+            <input type="text" id="cfg-model" list="model-list" placeholder="选择或输入模型 ID" class="form-input" value="glm-5.1">
+            <datalist id="model-list"></datalist>
+            <span class="form-hint">可从列表选择，也可直接输入任意模型 ID</span>
           </div>
           <button class="btn btn-primary" id="btn-test-api">测试连接</button>
           <span class="test-result" id="test-api-result"></span>

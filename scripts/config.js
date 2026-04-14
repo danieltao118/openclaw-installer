@@ -59,6 +59,11 @@ async function saveModelConfig(provider, apiKey, baseUrl, model) {
     openai: 'OPENAI_API_KEY',
     zhipu: 'ZHIPU_API_KEY',
     deepseek: 'DEEPSEEK_API_KEY',
+    qwen: 'DASHSCOPE_API_KEY',
+    kimi: 'MOONSHOT_API_KEY',
+    minimax: 'MINIMAX_API_KEY',
+    stepfun: 'STEPFUN_API_KEY',
+    custom: 'CUSTOM_API_KEY',
   };
 
   const envKey = envKeyMap[provider];
@@ -90,6 +95,11 @@ async function saveModelConfig(provider, apiKey, baseUrl, model) {
     'openai': `openai/${model}`,
     'zhipu': `zhipu/${model}`,
     'deepseek': `deepseek/${model}`,
+    'qwen': `qwen/${model}`,
+    'kimi': `moonshot/${model}`,
+    'minimax': `minimax/${model}`,
+    'stepfun': `stepfun/${model}`,
+    'custom': model, // 通用模式直接使用模型ID
   };
 
   config.agents.defaults.model = {
@@ -162,14 +172,19 @@ async function testApiConnection(provider, apiKey, baseUrl) {
   logger.info(`测试 API 连接: ${provider}`);
 
   const testUrls = {
-    anthropic: 'https://api.anthropic.com/v1/models',
-    openai: 'https://api.openai.com/v1/models',
-    zhipu: 'https://open.bigmodel.cn/api/paas/v4/models',
-    deepseek: 'https://api.deepseek.com/v1/models',
+    zhipu: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+    qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1/models',
+    kimi: 'https://api.moonshot.cn/v1/models',
+    minimax: 'https://api.minimax.chat/v1/models',
+    stepfun: 'https://api.stepfun.com/v1/models',
   };
 
   const url = baseUrl || testUrls[provider];
   if (!url) {
+    // 通用模式需要用户提供 Base URL
+    if (provider === 'custom') {
+      return { ok: false, message: '通用模式需要填写 API 地址' };
+    }
     return { ok: false, message: '未知的提供商' };
   }
 
@@ -189,6 +204,43 @@ async function testApiConnection(provider, apiKey, baseUrl) {
       headers['anthropic-version'] = '2023-06-01';
     }
 
+    // 智谱用 chat completions 端点，用 POST 发一个最小请求验证
+    if (provider === 'zhipu') {
+      const postData = JSON.stringify({
+        model: 'glm-4-flash',
+        messages: [{ role: 'user', content: 'hi' }],
+        max_tokens: 1,
+      });
+      headers['Content-Type'] = 'application/json';
+      headers['Content-Length'] = Buffer.byteLength(postData);
+
+      const options = {
+        method: 'POST',
+        headers,
+        timeout: 15000,
+      };
+
+      const req = client.request(url, options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => body += chunk);
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve({ ok: true, message: '连接成功！智谱 API Key 有效' });
+          } else if (res.statusCode === 401 || res.statusCode === 403) {
+            resolve({ ok: false, message: 'API Key 无效或已过期，请检查' });
+          } else {
+            // 其他状态码可能是余额不足等，但key格式正确
+            resolve({ ok: true, message: `已收到智谱服务器响应 (${res.statusCode})，Key 格式正确` });
+          }
+        });
+      });
+      req.on('error', (err) => resolve({ ok: false, message: `连接失败: ${err.message}` }));
+      req.on('timeout', () => { req.destroy(); resolve({ ok: false, message: '连接超时，请检查网络' }); });
+      req.write(postData);
+      req.end();
+      return; // 提前返回，不走下面的通用逻辑
+    }
+
     const options = {
       method: 'GET',
       headers,
@@ -196,7 +248,6 @@ async function testApiConnection(provider, apiKey, baseUrl) {
     };
 
     const req = client.request(url, options, (res) => {
-      // 消费响应体防止内存泄漏
       res.resume();
 
       if (res.statusCode >= 200 && res.statusCode < 300) {

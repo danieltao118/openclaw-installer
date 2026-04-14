@@ -161,15 +161,21 @@ async function runInstall() {
     setStepDone('istep-mirror');
     appendLog('npm 镜像源: registry.npmmirror.com');
 
-    // 步骤5: 安装 OpenClaw
-    updateTopProgress(70, '正在安装 OpenClaw...');
-    setStepActive('istep-install-openclaw');
-    appendLog('正在安装 OpenClaw（使用淘宝镜像）...');
+    // 步骤5: 安装 OpenClaw（如果需要）
+    if (envResult.openclawStatus !== 'installed') {
+      updateTopProgress(70, '正在安装 OpenClaw...');
+      setStepActive('istep-install-openclaw');
+      appendLog('正在安装 OpenClaw（使用淘宝镜像）...');
 
-    await window.installerAPI.installOpenclaw();
+      await window.installerAPI.installOpenclaw();
 
-    setStepDone('istep-install-openclaw');
-    updateTopProgress(90, 'OpenClaw 安装完成');
+      setStepDone('istep-install-openclaw');
+      updateTopProgress(90, 'OpenClaw 安装完成');
+    } else {
+      setStepDone('istep-install-openclaw');
+      appendLog('OpenClaw 已就绪，跳过安装');
+      updateTopProgress(90, 'OpenClaw 已就绪');
+    }
 
     // 步骤6: 验证
     updateTopProgress(95, '正在验证安装...');
@@ -272,16 +278,93 @@ $$('.config-tab').forEach(tab => {
   });
 });
 
-// 提供商切换时更新提示文字
-$('#cfg-provider').addEventListener('change', () => {
-  const hints = {
-    anthropic: '在 console.anthropic.com 获取 API Key',
-    openai: '在 platform.openai.com 获取 API Key',
-    zhipu: '在 open.bigmodel.cn 获取 API Key',
-    deepseek: '在 platform.deepseek.com 获取 API Key',
-  };
-  $('#cfg-key-hint').textContent = hints[$('#cfg-provider').value] || '';
-});
+// 提供商-模型联动
+const PROVIDER_MODELS = {
+  zhipu: {
+    hint: '在 open.bigmodel.cn 获取 API Key',
+    defaultModel: 'glm-5.1',
+    models: ['glm-5.1', 'glm-4.7', 'glm-4-flash', 'glm-4-plus', 'glm-4-long', 'glm-4-air'],
+    defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    keyUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
+  },
+  qwen: {
+    hint: '在 百炼控制台 获取 API Key',
+    defaultModel: 'qwen-max',
+    models: ['qwen-max', 'qwen-plus', 'qwen-turbo', 'qwen-long', 'qwen3-235b-a22b', 'qwen3-32b', 'qwen3-coder-plus'],
+    defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    keyUrl: 'https://bailian.console.aliyun.com/',
+  },
+  kimi: {
+    hint: '在 platform.moonshot.cn 获取 API Key',
+    defaultModel: 'moonshot-v1-128k',
+    models: ['moonshot-v1-128k', 'moonshot-v1-32k', 'moonshot-v1-8k', 'kimi-latest'],
+    defaultBaseUrl: 'https://api.moonshot.cn/v1',
+    keyUrl: 'https://platform.moonshot.cn/console/api-keys',
+  },
+  minimax: {
+    hint: '在 platform.minimaxi.com 获取 API Key',
+    defaultModel: 'MiniMax-Text-01',
+    models: ['MiniMax-Text-01', 'abab6.5s-chat', 'abab6.5g-chat', 'abab7-chat-preview'],
+    defaultBaseUrl: 'https://api.minimax.chat/v1',
+    keyUrl: 'https://platform.minimaxi.com/',
+  },
+  stepfun: {
+    hint: '在 platform.stepfun.com 获取 API Key',
+    defaultModel: 'step-2-16k',
+    models: ['step-2-16k', 'step-1-128k', 'step-1-8k', 'step-1-flash', 'step-1v-8k'],
+    defaultBaseUrl: 'https://api.stepfun.com/v1',
+    keyUrl: 'https://platform.stepfun.com/',
+  },
+  custom: {
+    hint: '填写供应商的 API Key',
+    defaultModel: '',
+    models: [],
+    defaultBaseUrl: '',
+    keyUrl: '',
+  },
+};
+
+function updateProviderUI() {
+  const provider = $('#cfg-provider').value;
+  const info = PROVIDER_MODELS[provider];
+  if (!info) return;
+
+  // 更新 hint 和链接
+  $('#cfg-key-hint').textContent = info.hint;
+  const linkEl = $('#cfg-key-link');
+  if (linkEl) {
+    if (info.keyUrl) {
+      linkEl.href = info.keyUrl;
+      linkEl.style.display = 'inline-block';
+    } else {
+      linkEl.style.display = 'none';
+    }
+  }
+
+  // 更新 datalist（建议列表）
+  const datalist = $('#model-list');
+  datalist.innerHTML = info.models.map(m => `<option value="${m}">`).join('');
+
+  // 更新模型输入框默认值
+  const modelInput = $('#cfg-model');
+  if (info.defaultModel) {
+    modelInput.value = info.defaultModel;
+  } else {
+    modelInput.value = '';
+    modelInput.placeholder = '输入模型 ID，例如: deepseek-chat';
+  }
+
+  // 预填 Base URL placeholder
+  const baseUrlInput = $('#cfg-baseurl');
+  if (baseUrlInput) {
+    baseUrlInput.placeholder = info.defaultBaseUrl || '填写 API 地址，例如: https://api.example.com/v1';
+  }
+}
+
+$('#cfg-provider').addEventListener('change', updateProviderUI);
+
+// 初始化
+updateProviderUI();
 
 // 测试 API 连接
 $('#btn-test-api').addEventListener('click', async () => {
@@ -313,7 +396,7 @@ $('#btn-save-model').addEventListener('click', async () => {
   const provider = $('#cfg-provider').value;
   const apiKey = $('#cfg-apikey').value.trim();
   const baseUrl = $('#cfg-baseurl').value.trim();
-  const model = $('#cfg-model').value;
+  const model = $('#cfg-model').value.trim();
 
   if (!apiKey) {
     $('#test-api-result').textContent = '请输入 API Key';

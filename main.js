@@ -105,6 +105,7 @@ ipcMain.handle('launch-openclaw', async (event) => {
     const child = spawn(cmd, ['gateway', 'start'], {
       detached: true,
       stdio: 'ignore',
+      shell: process.platform === 'win32',
       env: { ...process.env },
     });
     child.on('error', (err) => {
