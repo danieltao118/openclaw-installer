@@ -50,3 +50,4 @@ asarUnpack:
   - node_modules/sudo-prompt/**
 
 forceCodeSigning: false
+publish: never
