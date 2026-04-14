@@ -50,4 +50,6 @@ asarUnpack:
   - node_modules/sudo-prompt/**
 
 forceCodeSigning: false
-publish: never
+publish:
+  provider: generic
+  url: https://example.com/not-used
