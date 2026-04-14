@@ -89,11 +89,17 @@ async function runTests() {
 
   await testAsync('Node.js 下载 URL 有效', async () => {
     const https = require('https');
-    const url = process.platform === 'win32'
-      ? 'https://nodejs.org/dist/v22.14.0/node-v22.14.0-x64.msi'
-      : process.arch === 'arm64'
-        ? 'https://nodejs.org/dist/v22.14.0/node-v22.14.0-arm64.pkg'
-        : 'https://nodejs.org/dist/v22.14.0/node-v22.14.0-darwin-x64.pkg';
+    let url;
+    if (process.platform === 'win32') {
+      url = 'https://nodejs.org/dist/v22.14.0/node-v22.14.0-x64.msi';
+    } else if (process.platform === 'darwin') {
+      // macOS: darwin-arm64 或 darwin-x64
+      const arch = process.arch === 'arm64' ? 'darwin-arm64' : 'darwin-x64';
+      url = `https://nodejs.org/dist/v22.14.0/node-v22.14.0-${arch}.pkg`;
+    } else {
+      // Linux 等其他平台用 tar.gz
+      url = `https://nodejs.org/dist/v22.14.0/node-v22.14.0-${process.platform}-${process.arch}.tar.gz`;
+    }
 
     await new Promise((resolve, reject) => {
       const req = https.request(url, { method: 'HEAD', timeout: 15000 }, (res) => {
