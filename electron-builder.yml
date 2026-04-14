@@ -30,12 +30,15 @@ mac:
   target:
     - target: dmg
       arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
   icon: build/icon.png
   category: public.app-category.developer-tools
   hardenedRuntime: false
   identity: null
 dmg:
-  title: "OpenClaw Installer ${version}"
+  title: "OpenClaw-Installer-${version}"
+  writeUpdateInfo: false
   contents:
     - x: 130
       y: 220
