@@ -19,5 +19,16 @@ contextBridge.exposeInMainWorld('installerAPI', {
     ipcRenderer.invoke('test-api-connection', provider, apiKey, baseUrl),
   getConfigStatus: () => ipcRenderer.invoke('get-config-status'),
   launchOpenclaw: () => ipcRenderer.invoke('launch-openclaw'),
+  validateActivation: (code) => ipcRenderer.invoke('validate-activation', code),
+  checkActivation: () => ipcRenderer.invoke('check-activation'),
+  getVersions: () => ipcRenderer.invoke('get-versions'),
+  loginFeishuChannel: () => ipcRenderer.invoke('login-feishu-channel'),
+  onFeishuLoginOutput: (callback) => {
+    // 先移除旧监听，防止重复绑定
+    ipcRenderer.removeAllListeners('feishu-login-output');
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('feishu-login-output', listener);
+    return () => ipcRenderer.removeListener('feishu-login-output', listener);
+  },
   openLogFile: () => ipcRenderer.invoke('open-log-file'),
 });

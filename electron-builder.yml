@@ -18,8 +18,12 @@ win:
   target:
     - target: nsis
       arch: [x64]
+    - target: portable
+      arch: [x64]
   icon: build/icon.ico
   requestedExecutionLevel: requireAdministrator
+portable:
+  artifactName: OpenClaw-Portable.exe
 nsis:
   oneClick: true
   perMachine: true
@@ -51,6 +55,14 @@ asar: true
 asarUnpack:
   - scripts/**
   - node_modules/sudo-prompt/**
+
+extraResources:
+  - from: bundled
+    to: bundled
+    filter:
+      - "**/*"
+  - from: versions.json
+    to: versions.json
 
 forceCodeSigning: false
 publish:

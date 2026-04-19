@@ -1,12 +1,29 @@
 const { app, BrowserWindow, ipcMain, session } = require('electron');
 const path = require('path');
+const fs = require('fs');
+
+// 加载版本配置
+function loadVersions() {
+  try {
+    // 生产环境：从打包资源读取
+    const prodPath = path.join(process.resourcesPath, 'versions.json');
+    if (fs.existsSync(prodPath)) {
+      return JSON.parse(fs.readFileSync(prodPath, 'utf8'));
+    }
+  } catch {}
+  try {
+    // 开发环境：从项目根目录读取
+    return JSON.parse(fs.readFileSync(path.join(__dirname, 'versions.json'), 'utf8'));
+  } catch {}
+  return { node: 'unknown', openclaw: 'unknown', installer: '1.0.0' };
+}
 
 let mainWindow;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 700,
-    height: 580,
+    width: 820,
+    height: 720,
     resizable: false,
     maximizable: false,
     title: 'OpenClaw 安装向导',
@@ -48,7 +65,11 @@ function getCmd(name) {
 // IPC Handlers
 ipcMain.handle('detect-environment', async (event) => {
   const detect = require('./scripts/detect');
-  return detect(mainWindow);
+  return detect(mainWindow, loadVersions());
+});
+
+ipcMain.handle('get-versions', async () => {
+  return loadVersions();
 });
 
 ipcMain.handle('install-node', async (event) => {
@@ -98,8 +119,24 @@ ipcMain.handle('open-log-file', async (event) => {
   await shell.openPath(logger.LOG_FILE);
 });
 
+// 激活码相关 IPC
+ipcMain.handle('validate-activation', async (event, code) => {
+  const activation = require('./scripts/activation');
+  const result = activation.validateCode(code);
+  if (result.valid) {
+    return activation.activate(code);
+  }
+  return result;
+});
+
+ipcMain.handle('check-activation', async (event) => {
+  const activation = require('./scripts/activation');
+  return activation.isActivated();
+});
+
 ipcMain.handle('launch-openclaw', async (event) => {
   const { spawn } = require('child_process');
+  const logger = require('./scripts/logger');
   try {
     const cmd = getCmd('openclaw');
     const child = spawn(cmd, ['gateway', 'start'], {
@@ -116,4 +153,76 @@ ipcMain.handle('launch-openclaw', async (event) => {
   } catch (err) {
     return { success: false, error: err.message };
   }
+});
+
+// 飞书扫码登录 — 运行 openclaw channels login --channel feishu 并流式返回输出
+ipcMain.handle('login-feishu-channel', async (event) => {
+  const { spawn } = require('child_process');
+  const logger = require('./scripts/logger');
+
+  return new Promise((resolve) => {
+    const cmd = getCmd('openclaw');
+    const args = ['channels', 'login', '--channel', 'feishu'];
+
+    logger.info(`执行飞书扫码登录: ${cmd} ${args.join(' ')}`);
+
+    const child = spawn(cmd, args, {
+      shell: process.platform === 'win32',
+      env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+      cwd: require('os').homedir(),
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (data) => {
+      const text = data.toString();
+      stdout += text;
+      // 流式转发到前端
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('feishu-login-output', { text, stream: 'stdout' });
+      }
+    });
+
+    child.stderr.on('data', (data) => {
+      const text = data.toString();
+      stderr += text;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('feishu-login-output', { text, stream: 'stderr' });
+      }
+    });
+
+    child.on('close', (code) => {
+      logger.info(`飞书扫码登录完成, exit code: ${code}`);
+      resolve({
+        success: code === 0,
+        code,
+        stdout,
+        stderr,
+      });
+    });
+
+    child.on('error', (err) => {
+      logger.error(`飞书扫码登录失败: ${err.message}`);
+      resolve({
+        success: false,
+        code: -1,
+        stdout,
+        stderr: err.message,
+      });
+    });
+
+    // 超时保护：3分钟无操作自动终止
+    const timeout = setTimeout(() => {
+      child.kill();
+      resolve({
+        success: false,
+        code: -1,
+        stdout,
+        stderr: '操作超时，请重试',
+      });
+    }, 3 * 60 * 1000);
+
+    child.on('close', () => clearTimeout(timeout));
+  });
 });

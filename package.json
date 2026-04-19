@@ -3,19 +3,25 @@
   "version": "1.0.0",
   "description": "OpenClaw 一键安装程序 — 教培AI实战营专用",
   "main": "main.js",
+  "license": "MIT",
   "scripts": {
     "start": "electron .",
     "test": "node scripts/test.js",
     "test:e2e": "node scripts/e2e-test.js",
+    "prepare:bundled": "node scripts/download-bundled.js",
+    "set-version": "node scripts/set-version.js",
+    "generate-codes": "node scripts/generate-codes.js",
+    "prepare-usb": "node scripts/prepare-usb.js",
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
     "build:all": "electron-builder --win --mac"
   },
   "dependencies": {
+    "node-machine-id": "^1.1.12",
     "sudo-prompt": "^9.2.1"
   },
   "devDependencies": {
-    "electron": "^33.0.0",
+    "electron": "^33.4.11",
     "electron-builder": "^25.1.8"
   }
 }

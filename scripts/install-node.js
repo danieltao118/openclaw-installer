@@ -6,7 +6,8 @@ const os = require('os');
 const https = require('https');
 const logger = require('./logger');
 
-const NODE_VERSION = '22.22.2';
+const versions = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'versions.json'), 'utf8'));
+const NODE_VERSION = versions.node;
 const NODE_BASE_URL = `https://nodejs.org/dist/v${NODE_VERSION}/`;
 
 function getDownloadInfo(platform, arch) {
@@ -35,54 +36,84 @@ async function installNode(win) {
   const tmpDir = os.tmpdir();
   const destPath = path.join(tmpDir, filename);
 
+  // 优先使用内置资源
+  let bundledPath = null;
+  try {
+    const resPath = path.join(process.resourcesPath, 'bundled', filename);
+    if (fs.existsSync(resPath) && fs.statSync(resPath).size > 1024) {
+      bundledPath = resPath;
+      logger.info(`发现内置 Node.js: ${resPath}`);
+    }
+  } catch {
+    // resourcesPath 在开发环境可能不存在
+  }
+
   logger.info(`开始安装 Node.js v${NODE_VERSION}`);
-  logger.info(`下载地址: ${url}`);
 
-  // 检查磁盘空间
-  const freeSpace = checkDiskSpace(tmpDir);
-  if (freeSpace !== null && freeSpace < 500 * 1024 * 1024) {
-    throw new Error('磁盘空间不足，至少需要 500MB 可用空间。请清理磁盘后重试。');
-  }
-
-  // 下载（带重试）
-  if (win && !win.isDestroyed()) {
-    win.webContents.send('install-progress', {
-      stepActive: 'istep-download-node',
-      message: `正在下载 Node.js v${NODE_VERSION}...`,
-    });
-  }
-
-  const MAX_RETRIES = 3;
-  let lastError = null;
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      logger.info(`下载尝试 ${attempt}/${MAX_RETRIES}`);
-      if (win && !win.isDestroyed()) {
-        win.webContents.send('install-progress', {
-          message: attempt > 1 ? `下载超时，正在重试 (${attempt}/${MAX_RETRIES})...` : `正在下载 Node.js v${NODE_VERSION}...`,
-        });
-      }
-      await downloadFile(url, destPath, (percent) => {
-        if (win && !win.isDestroyed()) {
-          win.webContents.send('install-progress', { percent: percent * 0.4 });
-        }
+  if (bundledPath) {
+    // 使用内置资源，无需下载
+    logger.info('使用内置安装包，跳过下载');
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('install-progress', {
+        stepActive: 'istep-download-node',
+        stepDone: 'istep-download-node',
+        message: '使用内置安装包，无需下载',
+        percent: 40,
       });
-      lastError = null;
-      break;
-    } catch (err) {
-      lastError = err;
-      logger.warn(`下载第 ${attempt} 次失败: ${err.message}`);
-      if (attempt < MAX_RETRIES) {
-        await sleep(2000 * attempt); // 指数退避: 2s, 4s
+    }
+    // 复制到临时目录（避免直接操作 resources 内文件）
+    fs.copyFileSync(bundledPath, destPath);
+    logger.info(`已复制到: ${destPath}`);
+  } else {
+    // 回退到在线下载
+    logger.info(`下载地址: ${url}`);
+
+    // 检查磁盘空间
+    const freeSpace = checkDiskSpace(tmpDir);
+    if (freeSpace !== null && freeSpace < 500 * 1024 * 1024) {
+      throw new Error('磁盘空间不足，至少需要 500MB 可用空间。请清理磁盘后重试。');
+    }
+
+    // 下载（带重试）
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('install-progress', {
+        stepActive: 'istep-download-node',
+        message: `正在下载 Node.js v${NODE_VERSION}...`,
+      });
+    }
+
+    const MAX_RETRIES = 3;
+    let lastError = null;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        logger.info(`下载尝试 ${attempt}/${MAX_RETRIES}`);
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('install-progress', {
+            message: attempt > 1 ? `下载超时，正在重试 (${attempt}/${MAX_RETRIES})...` : `正在下载 Node.js v${NODE_VERSION}...`,
+          });
+        }
+        await downloadFile(url, destPath, (percent) => {
+          if (win && !win.isDestroyed()) {
+            win.webContents.send('install-progress', { percent: percent * 0.4 });
+          }
+        });
+        lastError = null;
+        break;
+      } catch (err) {
+        lastError = err;
+        logger.warn(`下载第 ${attempt} 次失败: ${err.message}`);
+        if (attempt < MAX_RETRIES) {
+          await sleep(2000 * attempt);
+        }
       }
     }
-  }
 
-  if (lastError) {
-    throw new Error(`下载 Node.js 失败（已重试 ${MAX_RETRIES} 次）: ${lastError.message}\n请检查网络连接，或手动下载安装: ${url}`);
-  }
+    if (lastError) {
+      throw new Error(`下载 Node.js 失败（已重试 ${MAX_RETRIES} 次）: ${lastError.message}\n请检查网络连接，或手动下载安装: ${url}`);
+    }
 
-  logger.info(`下载完成: ${destPath}`);
+    logger.info(`下载完成: ${destPath}`);
+  }
 
   // 安装
   if (win && !win.isDestroyed()) {

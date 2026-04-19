@@ -1,0 +1,55 @@
+OpenClaw 一键安装器 — 第三方许可证声明
+============================================
+
+本安装器包含以下第三方开源组件，各组件的版权归其原作者所有。
+
+------------------------------------------------------------
+1. OpenClaw
+   许可证: MIT License
+   版权: Copyright (c) 2025 Peter Steinberger
+   来源: https://github.com/openclaw/openclaw
+   说明: Multi-channel AI gateway with extensible messaging integrations
+
+------------------------------------------------------------
+2. Electron
+   许可证: MIT License
+   版权: Copyright (c) Electron contributors
+   来源: https://github.com/electron/electron
+   说明: 桌面应用框架，基于 Chromium 和 Node.js
+
+------------------------------------------------------------
+3. electron-builder
+   许可证: MIT License
+   版权: Copyright (c) electron-builder contributors
+   来源: https://github.com/electron-userland/electron-builder
+   说明: Electron 应用打包工具
+
+------------------------------------------------------------
+4. Node.js
+   许可证: MIT License
+   版权: Copyright (c) OpenJS Foundation and Node.js contributors
+   来源: https://github.com/nodejs/node
+   说明: JavaScript 运行时环境
+
+------------------------------------------------------------
+5. Chromium
+   许可证: BSD-style licenses (multiple)
+   版权: Copyright (c) The Chromium Authors
+   来源: https://chromium.org
+   说明: Electron 内嵌的浏览器引擎
+
+------------------------------------------------------------
+
+品牌使用声明
+------------
+OpenClaw 及龙虾 logo 是 OpenClaw 项目的品牌资产。
+本安装器由行知商学·教培AI实战营制作，非 OpenClaw 官方产品。
+"OpenClaw" 名称仅用于描述本安装器所安装的目标软件。
+
+隐私声明
+--------
+本安装器所有数据仅存储在用户本地设备：
+- API Key 仅保存在本地 OpenClaw 配置文件中
+- 飞书 App 凭证仅保存在本地配置中
+- 系统环境信息仅用于安装流程判断，不外传
+- 本安装器不收集、不上传任何用户数据

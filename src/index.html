@@ -8,6 +8,13 @@
 </head>
 <body>
   <div id="app">
+    <!-- 背景光晕 -->
+    <div class="bg-glow">
+      <div class="glow glow-1"></div>
+      <div class="glow glow-2"></div>
+      <div class="glow glow-3"></div>
+    </div>
+
     <!-- 顶部进度条 -->
     <div class="top-bar">
       <div class="progress-track">
@@ -19,12 +26,66 @@
     <!-- 步骤1: 欢迎 -->
     <div id="step-welcome" class="step active">
       <div class="card center-card">
-        <div class="logo">🦞</div>
-        <h1>OpenClaw 一键安装器</h1>
+        <div class="logo">
+          <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" width="80" height="80">
+            <!-- Lobster Claw Silhouette -->
+            <path d="M60 10 C30 10 15 35 15 55 C15 75 30 95 45 100 L45 110 L55 110 L55 100 C55 100 60 102 65 100 L65 110 L75 110 L75 100 C90 95 105 75 105 55 C105 35 90 10 60 10Z" fill="url(#lobster-gradient)" class="claw-body"></path>
+            <!-- Left Claw -->
+            <path d="M20 45 C5 40 0 50 5 60 C10 70 20 65 25 55 C28 48 25 45 20 45Z" fill="url(#lobster-gradient)" class="claw-left"></path>
+            <!-- Right Claw -->
+            <path d="M100 45 C115 40 120 50 115 60 C110 70 100 65 95 55 C92 48 95 45 100 45Z" fill="url(#lobster-gradient)" class="claw-right"></path>
+            <!-- Antenna -->
+            <path d="M45 15 Q35 5 30 8" stroke="#FF6B6B" stroke-width="2" stroke-linecap="round" class="antenna"></path>
+            <path d="M75 15 Q85 5 90 8" stroke="#FF6B6B" stroke-width="2" stroke-linecap="round" class="antenna"></path>
+            <!-- Eyes -->
+            <circle cx="45" cy="35" r="6" fill="#050810" class="eye"></circle>
+            <circle cx="75" cy="35" r="6" fill="#050810" class="eye"></circle>
+            <circle cx="46" cy="34" r="2" fill="#00e5cc" class="eye-glow"></circle>
+            <circle cx="76" cy="34" r="2" fill="#00e5cc" class="eye-glow"></circle>
+            <defs>
+              <linearGradient id="lobster-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#FF6B6B"></stop>
+                <stop offset="100%" stop-color="#FF8E53"></stop>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <h1><span class="title-gradient">OpenClaw</span> 一键安装器</h1>
         <p class="subtitle">教培AI实战营 · 专属工具</p>
-        <p class="version">版本 1.0.0</p>
-        <p class="desc">本程序将帮助您自动安装 Node.js 运行环境和 OpenClaw 工具。<br>安装过程约需 3-5 分钟，请保持网络连接。</p>
-        <button class="btn btn-primary" id="btn-start">开始安装</button>
+        <p class="version" id="version-text">版本 1.0.0 · 由行知商学制作</p>
+        <p class="desc">本程序将帮助您自动安装 Node.js 运行环境和 OpenClaw 工具。<br>安装过程约需 3-5 分钟。</p>
+        <div class="welcome-tips">
+          <p class="tip-title">安装前请留意：</p>
+          <ul>
+            <li>如遇到"Windows 已保护你的电脑"提示，请点击 <strong>更多信息</strong> → <strong>仍要运行</strong></li>
+            <li>如安装被拦截，请临时关闭杀毒软件（360、火绒等）后重试</li>
+            <li>安装需要管理员权限，如弹出权限请求请点击"是"</li>
+          </ul>
+        </div>
+        <button class="btn btn-primary" id="btn-start" disabled>开始安装</button>
+        <!-- 激活码区域 -->
+        <div class="activation-area" id="activation-area">
+          <div class="activation-input-row" id="activation-input-row">
+            <input type="text" id="activation-code" class="form-input activation-input" placeholder="输入激活码，例如 OC-C-7nHr3K-B2m9F4-A3E8-B7D2C1" maxlength="35" autocomplete="off">
+            <button class="btn btn-primary btn-sm" id="btn-activate">验证</button>
+          </div>
+          <p class="activation-status" id="activation-status">请输入激活码以解锁安装器</p>
+        </div>
+        <div class="activation-done hidden" id="activation-done">
+          <span class="activation-done-icon">✅</span>
+          <span class="activation-done-text" id="activation-done-text">已激活</span>
+        </div>
+        <div class="update-banner hidden" id="update-banner">
+          <span class="update-icon">🔄</span>
+          <div class="update-info">
+            <div class="update-title" id="update-title">发现新版本</div>
+            <div class="update-detail" id="update-detail"></div>
+          </div>
+        </div>
+        <p class="footer-links">
+          <a href="#" id="btn-about" class="btn-link">版权声明与开源许可</a>
+          · <a href="#" id="btn-privacy" class="btn-link">隐私说明</a>
+        </p>
       </div>
     </div>
 
@@ -89,7 +150,6 @@
               <option value="qwen">阿里云百炼 (通义千问)</option>
               <option value="kimi">Kimi (月之暗面)</option>
               <option value="minimax">MiniMax</option>
-              <option value="stepfun">阶跃星辰 (Step)</option>
               <option value="custom">通用 (OpenAI 兼容协议)</option>
             </select>
             <span class="form-hint" id="cfg-provider-hint">大多数国内供应商使用 OpenAI Completions 兼容协议</span>
@@ -99,7 +159,7 @@
             <input type="password" id="cfg-apikey" placeholder="输入您的 API Key" class="form-input">
             <div class="key-hint-row">
               <span class="form-hint" id="cfg-key-hint">在 open.bigmodel.cn 获取 API Key</span>
-              <a id="cfg-key-link" href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank" class="btn btn-link">获取 API Key →</a>
+              <a id="cfg-key-link" href="https://www.bigmodel.cn/invite?icode=fUalT%2FJzsW3InfvOR%2Blk9pmwcr074zMJTpgMb8zZZvg%3D" target="_blank" class="btn btn-link">获取 API Key →</a>
             </div>
           </div>
           <div class="form-group" id="group-baseurl">
@@ -125,22 +185,65 @@
         <div id="tab-channel" class="config-panel">
           <div class="channel-info">
             <h3>📱 连接飞书通道</h3>
-            <p>OpenClaw 可以通过飞书接收和回复消息。安装完成后，在终端运行以下命令连接：</p>
-            <div class="code-block">openclaw channels add feishu</div>
-            <p class="form-hint" style="margin-top:12px">按照提示输入飞书机器人凭证即可完成连接。</p>
-            <p>也可以在下方预先填写飞书 App 信息：</p>
+            <p>OpenClaw 支持通过飞书接收和回复消息。使用扫码方式一键配置，无需手动创建应用。</p>
           </div>
-          <div class="form-group">
-            <label>飞书 App ID</label>
-            <input type="text" id="cfg-feishu-appid" placeholder="cli_xxxxxxxxxxxx" class="form-input">
+
+          <!-- 扫码状态区域 -->
+          <div id="feishu-scan-area">
+            <div id="feishu-scan-idle" class="scan-state">
+              <div class="scan-illustration">
+                <svg viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="4" y="4" width="20" height="20" rx="2"/>
+                  <rect x="40" y="4" width="20" height="20" rx="2"/>
+                  <rect x="4" y="40" width="20" height="20" rx="2"/>
+                  <rect x="44" y="44" width="12" height="12" rx="1"/>
+                  <path d="M32 24v-8M32 40v8M24 32h-8M40 32h8"/>
+                </svg>
+              </div>
+              <p class="scan-desc">点击下方按钮开始扫码配置，用飞书 App 扫描终端中的二维码即可完成连接。</p>
+              <button class="btn btn-primary btn-scan" id="btn-scan-feishu">扫码配置飞书</button>
+              <div class="scan-divider"><span>或者</span></div>
+              <button class="btn btn-secondary btn-sm" id="btn-manual-feishu">手动填写 App 凭证</button>
+            </div>
+
+            <div id="feishu-scan-running" class="scan-state hidden">
+              <p class="scan-status">正在启动扫码流程...</p>
+              <div class="scan-terminal" id="feishu-terminal"></div>
+              <p class="scan-hint">请在弹出的终端窗口中扫描二维码</p>
+            </div>
+
+            <div id="feishu-scan-success" class="scan-state hidden">
+              <div class="scan-success-icon">✅</div>
+              <p class="scan-status-success">飞书通道配置成功！</p>
+            </div>
+
+            <div id="feishu-scan-error" class="scan-state hidden">
+              <div class="scan-error-icon">⚠️</div>
+              <p class="scan-status-error" id="feishu-error-msg">扫码配置失败</p>
+              <button class="btn btn-secondary btn-sm" id="btn-retry-scan">重试</button>
+              <button class="btn btn-secondary btn-sm" id="btn-fallback-manual">改为手动填写</button>
+            </div>
+
+            <!-- 手动填写表单（默认隐藏） -->
+            <div id="feishu-manual-form" class="hidden">
+              <div class="form-group">
+                <label>飞书 App ID</label>
+                <input type="text" id="cfg-feishu-appid" placeholder="cli_xxxxxxxxxxxx" class="form-input">
+              </div>
+              <div class="form-group">
+                <label>飞书 App Secret</label>
+                <input type="password" id="cfg-feishu-secret" placeholder="输入飞书 App Secret" class="form-input">
+              </div>
+              <div class="btn-row">
+                <button class="btn btn-secondary" id="btn-back-scan">← 返回扫码</button>
+                <button class="btn btn-primary" id="btn-save-channel">保存并完成 →</button>
+              </div>
+            </div>
           </div>
-          <div class="form-group">
-            <label>飞书 App Secret</label>
-            <input type="password" id="cfg-feishu-secret" placeholder="输入飞书 App Secret" class="form-input">
-          </div>
-          <div class="btn-row">
+
+          <div class="btn-row" id="feishu-bottom-actions">
             <button class="btn btn-secondary" id="btn-back-model">← 返回</button>
-            <button class="btn btn-primary" id="btn-save-channel">保存并完成 →</button>
+            <button class="btn btn-primary" id="btn-skip-channel">完成配置 →</button>
           </div>
         </div>
 
@@ -181,6 +284,18 @@
         <div class="btn-row">
           <button class="btn btn-secondary" id="btn-open-log2">查看日志文件</button>
           <button class="btn btn-primary" id="btn-retry">重新安装</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 关于弹窗 -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 id="modal-title">版权声明与开源许可</h2>
+          <button class="modal-close" id="btn-modal-close">&times;</button>
+        </div>
+        <div class="modal-body" id="modal-body">
         </div>
       </div>
     </div>

@@ -1,13 +1,33 @@
-// scripts/install-openclaw.js — 通过 npm 安装 OpenClaw（带重试）
+// scripts/install-openclaw.js — 通过 npm 安装 OpenClaw（优先使用内置包，带重试）
 const { spawn, execSync } = require('child_process');
+const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
 
 const NPM_MIRROR = 'https://registry.npmmirror.com';
 const MAX_RETRIES = 3;
 
+// 从 versions.json 读取指定的稳定版本
+const versions = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'versions.json'), 'utf8'));
+const OPENCLAW_VERSION = versions.openclaw;
+
 async function installOpenclaw(win) {
   logger.info('开始安装 OpenClaw...');
+
+  // 检测内置 tarball
+  let bundledTgz = null;
+  try {
+    const resDir = path.join(process.resourcesPath, 'bundled');
+    if (fs.existsSync(resDir)) {
+      const files = fs.readdirSync(resDir).filter(f => f.startsWith('openclaw-') && f.endsWith('.tgz'));
+      if (files.length > 0) {
+        bundledTgz = path.join(resDir, files[0]);
+        logger.info(`发现内置 OpenClaw: ${bundledTgz}`);
+      }
+    }
+  } catch {
+    // resourcesPath 在开发环境可能不存在
+  }
 
   let lastError = null;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -18,7 +38,7 @@ async function installOpenclaw(win) {
           message: `安装失败，正在重试 (${attempt}/${MAX_RETRIES})...`,
         });
       }
-      await runNpmInstall(win);
+      await runNpmInstall(win, bundledTgz);
       logger.info('OpenClaw 安装成功');
       return { success: true };
     } catch (err) {
@@ -30,7 +50,7 @@ async function installOpenclaw(win) {
     }
   }
 
-  throw new Error(`OpenClaw 安装失败（已重试 ${MAX_RETRIES} 次）。\n${lastError.message}\n\n请尝试手动执行:\nnpm install -g openclaw --registry=${NPM_MIRROR}`);
+  throw new Error(`OpenClaw 安装失败（已重试 ${MAX_RETRIES} 次）。\n${lastError.message}\n\n请尝试手动执行:\nnpm install -g openclaw@${OPENCLAW_VERSION} --registry=${NPM_MIRROR}`);
 }
 
 function getNpmPath() {
@@ -54,17 +74,28 @@ function getNpmPath() {
   return 'npm.cmd';
 }
 
-function runNpmInstall(win) {
+function runNpmInstall(win, bundledTgz) {
   return new Promise((resolve, reject) => {
     const npmPath = getNpmPath();
     logger.info(`npm 路径: ${npmPath}`);
 
-    const child = spawn('cmd', ['/c', npmPath, 'install', '-g', 'openclaw',
-      `--registry=${NPM_MIRROR}`,
-      '--prefer-online',
-      '--no-audit',
-      '--no-fund',
-    ], {
+    let args;
+    if (bundledTgz && fs.existsSync(bundledTgz)) {
+      // 使用内置 tarball
+      logger.info(`使用内置 tarball: ${bundledTgz}`);
+      args = ['install', '-g', bundledTgz, '--no-audit', '--no-fund'];
+    } else {
+      // 回退到在线安装（指定稳定版本）
+      logger.info(`使用在线安装 (v${OPENCLAW_VERSION})`);
+      args = ['install', '-g', `openclaw@${OPENCLAW_VERSION}`,
+        `--registry=${NPM_MIRROR}`,
+        '--prefer-online',
+        '--no-audit',
+        '--no-fund',
+      ];
+    }
+
+    const child = spawn('cmd', ['/c', npmPath, ...args], {
       stdio: 'pipe',
       env: { ...process.env },
       windowsHide: true,
