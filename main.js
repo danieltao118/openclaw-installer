@@ -120,7 +120,29 @@ ipcMain.handle('open-log-file', async (event) => {
 });
 
 // 激活码相关 IPC
+// 便携模式检测：Windows portable 设置 PORTABLE_EXECUTABLE_DIR，或存在 .portable 标记文件
+const isPortableMode = (() => {
+  if (process.env.PORTABLE_EXECUTABLE_DIR) return true;
+  try {
+    // 检查可执行文件同目录及上级目录的 .portable 标记
+    const appDir = process.platform === 'darwin'
+      ? path.dirname(path.dirname(path.dirname(app.getAppPath()))) // macOS .app/Contents/Resources/app.asar
+      : path.dirname(app.getPath('exe'));
+    for (let dir = appDir; dir !== path.dirname(dir); dir = path.dirname(dir)) {
+      if (fs.existsSync(path.join(dir, '.portable'))) return true;
+    }
+  } catch {}
+  return false;
+})();
+
+ipcMain.handle('is-portable-mode', async () => {
+  return isPortableMode;
+});
+
 ipcMain.handle('validate-activation', async (event, code) => {
+  if (isPortableMode) {
+    return { success: true, type: 'C', typeName: '便携版', days: 9999 };
+  }
   const activation = require('./scripts/activation');
   const result = activation.validateCode(code);
   if (result.valid) {
@@ -130,6 +152,9 @@ ipcMain.handle('validate-activation', async (event, code) => {
 });
 
 ipcMain.handle('check-activation', async (event) => {
+  if (isPortableMode) {
+    return { activated: true, type: 'C', typeName: '便携版', daysLeft: 9999, expiresAt: '2099-12-31' };
+  }
   const activation = require('./scripts/activation');
   return activation.isActivated();
 });

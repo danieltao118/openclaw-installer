@@ -263,7 +263,12 @@ async function main() {
     const src = path.join(templatesDir, f);
     const dst = path.join(drive, f);
     if (fs.existsSync(src)) {
-      fs.writeFileSync(dst, fs.readFileSync(src));
+      let content = fs.readFileSync(src);
+      // .bat 文件必须用 UTF-8 + CRLF 换行符
+      if (f.endsWith('.bat')) {
+        content = Buffer.from(content.toString('utf8').replace(/(?<!\r)\n/g, '\r\n'), 'utf8');
+      }
+      fs.writeFileSync(dst, content);
       console.log(`  ${f}`);
     }
   }

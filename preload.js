@@ -21,6 +21,7 @@ contextBridge.exposeInMainWorld('installerAPI', {
   launchOpenclaw: () => ipcRenderer.invoke('launch-openclaw'),
   validateActivation: (code) => ipcRenderer.invoke('validate-activation', code),
   checkActivation: () => ipcRenderer.invoke('check-activation'),
+  isPortableMode: () => ipcRenderer.invoke('is-portable-mode'),
   getVersions: () => ipcRenderer.invoke('get-versions'),
   loginFeishuChannel: () => ipcRenderer.invoke('login-feishu-channel'),
   onFeishuLoginOutput: (callback) => {
