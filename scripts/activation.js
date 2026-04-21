@@ -15,8 +15,9 @@ const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
 // 激活码类型
 const CODE_TYPES = {
-  C: { name: '实战营', days: 365 },
-  T: { name: '体验', days: 30 },
+  C: { name: '实战营学员', days: 365 },
+  T: { name: '咨询试用', days: 7 },
+  D: { name: '活动体验', days: 3 },
 };
 
 // 激活状态文件
@@ -79,9 +80,9 @@ function validateCode(code) {
 
   const trimmed = code.trim();
 
-  // 格式检查: OC-C-xxxxxx-xxxxxx-XXXX-XXXXXX
+  // 格式检查: OC-TYPE-xxxxxx-xxxxxx-XXXX-XXXXXX
   // RAND 段允许大小写字母+数字，CHECK 段为大写 hex
-  const match = trimmed.match(/^OC-([CT])-([A-Za-z0-9]{6})-([A-Za-z0-9]{6})-([A-F0-9]{4})-([A-F0-9]{6})$/i);
+  const match = trimmed.match(/^OC-([CTD])-([A-Za-z0-9]{6})-([A-Za-z0-9]{6})-([A-F0-9]{4})-([A-F0-9]{6})$/i);
   if (!match) {
     return { valid: false, reason: '激活码格式不正确' };
   }
