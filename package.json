@@ -12,6 +12,7 @@
     "set-version": "node scripts/set-version.js",
     "generate-codes": "node scripts/generate-codes.js",
     "prepare-usb": "node scripts/prepare-usb.js",
+    "package-offline": "node scripts/package-offline.js",
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
     "build:all": "electron-builder --win --mac"

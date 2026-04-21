@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenClaw 安装器激活码</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { font-size: 16px; }
+body {
+  font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", Inter, sans-serif;
+  background: #0d0d1a;
+  color: #e0e0e8;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-image:
+    radial-gradient(ellipse at 50% 20%, rgba(233,69,96,0.1) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 80%, rgba(15,52,96,0.25) 0%, transparent 50%);
+}
+
+.card {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 20px;
+  padding: 48px 36px;
+  max-width: 420px;
+  width: 90%;
+  text-align: center;
+  backdrop-filter: blur(12px);
+}
+
+.logo { font-size: 56px; margin-bottom: 12px; }
+
+h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.brand {
+  font-size: 0.95rem;
+  color: #e94560;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.subtitle {
+  font-size: 0.85rem;
+  color: #8888a0;
+  margin-bottom: 32px;
+}
+
+.input-group {
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+label {
+  display: block;
+  font-size: 0.9rem;
+  color: #a0a0b8;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.input-wrap {
+  position: relative;
+}
+
+.prefix {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #666;
+  font-size: 0.95rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+input {
+  width: 100%;
+  padding: 16px 16px 16px 52px;
+  background: rgba(255,255,255,0.04);
+  border: 2px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  font-size: 1.1rem;
+  letter-spacing: 2px;
+  color: #fff;
+  outline: none;
+  transition: border-color 0.3s, background 0.3s;
+  font-family: inherit;
+}
+
+input:focus {
+  border-color: #e94560;
+  background: rgba(233,69,96,0.04);
+}
+
+input.valid {
+  border-color: #4ade80;
+}
+
+input.invalid {
+  border-color: #ef4444;
+}
+
+.input-hint {
+  font-size: 0.8rem;
+  margin-top: 8px;
+  min-height: 20px;
+  transition: color 0.2s;
+}
+
+.input-hint.ok { color: #4ade80; }
+.input-hint.err { color: #ef4444; }
+.input-hint.info { color: #555; }
+
+.btn-claim {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, #e94560, #c23152);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+  font-family: inherit;
+}
+
+.btn-claim:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(233,69,96,0.35);
+}
+
+.btn-claim:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.msg {
+  margin-top: 16px;
+  font-size: 0.9rem;
+  color: #a0a0b8;
+  min-height: 24px;
+}
+
+.msg.error { color: #ef4444; }
+.msg.success { color: #4ade80; }
+
+.result {
+  display: none;
+  margin-top: 28px;
+  padding: 24px;
+  background: rgba(74,222,128,0.06);
+  border: 1px solid rgba(74,222,128,0.15);
+  border-radius: 16px;
+}
+
+.result.show { display: block; }
+
+.result-label {
+  font-size: 0.9rem;
+  color: #a0a0b8;
+  margin-bottom: 12px;
+}
+
+.code-box {
+  font-size: 0.85rem;
+  font-family: "SF Mono", "Fira Code", monospace;
+  background: rgba(255,255,255,0.06);
+  padding: 14px 16px;
+  border-radius: 10px;
+  margin: 0 0 16px;
+  word-break: break-all;
+  user-select: all;
+  color: #f5c518;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  border: 1px solid rgba(245,197,24,0.15);
+}
+
+.btn-copy {
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #4ade80, #22c55e);
+  color: #0d0d1a;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s;
+  font-family: inherit;
+}
+
+.btn-copy:hover {
+  transform: translateY(-1px);
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 16px;
+  line-height: 1.7;
+}
+
+.footer-info {
+  margin-top: 32px;
+  font-size: 0.75rem;
+  color: #444;
+}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="logo">🔑</div>
+  <h1>OpenClaw 安装器激活码</h1>
+  <p class="brand">行知商学 · 教培AI实战营</p>
+  <p class="subtitle">输入手机号，领取您的安装器激活码</p>
+
+  <div class="input-group">
+    <label>手机号</label>
+    <div class="input-wrap">
+      <span class="prefix">+86</span>
+      <input type="tel" id="phone" placeholder="请输入11位手机号" maxlength="11" autocomplete="tel">
+    </div>
+    <div id="input-hint" class="input-hint info">支持移动、联通、电信号段</div>
+  </div>
+
+  <button id="btn" class="btn-claim" onclick="claimCode()" disabled>领取安装器激活码</button>
+  <div id="msg" class="msg"></div>
+
+  <div id="result" class="result">
+    <div class="result-label">您的激活码：</div>
+    <div class="code-box" id="code-text"></div>
+    <button class="btn-copy" onclick="copyCode()">复制激活码</button>
+    <div class="hint">
+      请复制激活码，在 OpenClaw 安装器中输入即可激活<br>
+      有效期：领取后 3 天
+    </div>
+  </div>
+
+  <div class="footer-info">© 2026 行知商学 · 教培AI实战营</div>
+</div>
+
+<script>
+// 有效号段前缀（2026年）
+const VALID_PREFIXES = [
+  '13','14','15','16','17','18','19'
+];
+
+const phoneInput = document.getElementById('phone');
+const hintEl = document.getElementById('input-hint');
+const btn = document.getElementById('btn');
+
+// 只允许输入数字
+phoneInput.addEventListener('input', () => {
+  phoneInput.value = phoneInput.value.replace(/\D/g, '');
+  validateInput();
+});
+
+phoneInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !btn.disabled) claimCode();
+});
+
+function validateInput() {
+  const val = phoneInput.value;
+  phoneInput.classList.remove('valid', 'invalid');
+
+  if (val.length === 0) {
+    hintEl.className = 'input-hint info';
+    hintEl.textContent = '支持移动、联通、电信号段';
+    btn.disabled = true;
+    return;
+  }
+
+  if (val.length < 3) {
+    const prefix = val.substring(0, 2);
+    if (!VALID_PREFIXES.includes(prefix)) {
+      phoneInput.classList.add('invalid');
+      hintEl.className = 'input-hint err';
+      hintEl.textContent = '无效的号段前缀';
+      btn.disabled = true;
+      return;
+    }
+    hintEl.className = 'input-hint info';
+    hintEl.textContent = `已输入 ${val.length}/11 位`;
+    btn.disabled = true;
+    return;
+  }
+
+  // 检查号段
+  const prefix = val.substring(0, 2);
+  if (!VALID_PREFIXES.includes(prefix)) {
+    phoneInput.classList.add('invalid');
+    hintEl.className = 'input-hint err';
+    hintEl.textContent = '无效的号段，请检查手机号';
+    btn.disabled = true;
+    return;
+  }
+
+  if (val.length < 11) {
+    hintEl.className = 'input-hint info';
+    hintEl.textContent = `已输入 ${val.length}/11 位`;
+    btn.disabled = true;
+    return;
+  }
+
+  // 11位完整校验
+  if (val.length === 11) {
+    // 二次号段精确校验
+    const fullPrefix = val.substring(0, 3);
+    const validFullPrefixes = /^1(3\d|4[5-9]|5[0-35-9]|6[2567]|7[0-8]|8\d|9[0-35-9])\d{8}$/;
+    if (!validFullPrefixes.test(val)) {
+      phoneInput.classList.add('invalid');
+      hintEl.className = 'input-hint err';
+      hintEl.textContent = '手机号格式不正确，请检查';
+      btn.disabled = true;
+      return;
+    }
+
+    phoneInput.classList.add('valid');
+    hintEl.className = 'input-hint ok';
+    hintEl.textContent = '手机号格式正确';
+    btn.disabled = false;
+  }
+}
+
+async function claimCode() {
+  const phone = phoneInput.value.trim();
+  const msg = document.getElementById('msg');
+  const result = document.getElementById('result');
+
+  btn.disabled = true;
+  btn.textContent = '领取中...';
+  msg.textContent = '';
+  msg.className = 'msg';
+  result.className = 'result';
+
+  try {
+    const resp = await fetch('/claim', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone }),
+    });
+    const data = await resp.json();
+
+    if (data.ok && data.code) {
+      document.getElementById('code-text').textContent = data.code;
+      result.className = 'result show';
+      msg.className = 'msg success';
+      msg.textContent = data.msg === '您已领取过激活码' ? '您之前已领取，码不变' : '领取成功！';
+      btn.textContent = '已领取';
+    } else {
+      msg.className = 'msg error';
+      msg.textContent = data.msg || '领取失败';
+      btn.disabled = false;
+      btn.textContent = '领取安装器激活码';
+    }
+  } catch (e) {
+    msg.className = 'msg error';
+    msg.textContent = '网络错误，请重试';
+    btn.disabled = false;
+    btn.textContent = '领取安装器激活码';
+  }
+}
+
+function copyCode() {
+  const code = document.getElementById('code-text').textContent;
+  navigator.clipboard.writeText(code).then(() => {
+    const btn = document.querySelector('.btn-copy');
+    btn.textContent = '已复制 ✓';
+    setTimeout(() => btn.textContent = '复制激活码', 2000);
+  });
+}
+</script>
+</body>
+</html>
