@@ -50,7 +50,10 @@ async function detect(win, versions) {
     }
   }
 
-  // 3. 检测 Node.js
+  // 3. 先刷新 PATH（Electron 进程可能没拿到最新的系统 PATH）
+  refreshEnvPath();
+
+  // 4. 检测 Node.js
   try {
     const ver = execSync('node --version', { timeout: 5000, encoding: 'utf8' }).trim();
     result.nodeVersion = ver;
@@ -70,7 +73,17 @@ async function detect(win, versions) {
     logger.info('Node.js: 未安装');
   }
 
-  // 4. 检测 OpenClaw
+  // 5. 检测 OpenClaw
+  // OpenClaw 安装在 npm 全局目录，确保 npm 路径也在 PATH 中
+  if (process.platform === 'win32') {
+    try {
+      const npmGlobal = execSync('npm config get prefix', { timeout: 5000, encoding: 'utf8' }).trim();
+      if (npmGlobal && !process.env.PATH.toLowerCase().includes(npmGlobal.toLowerCase())) {
+        process.env.PATH = npmGlobal + ';' + process.env.PATH;
+        logger.info(`添加 npm 全局目录到 PATH: ${npmGlobal}`);
+      }
+    } catch {}
+  }
   try {
     const cmd = getCmd('openclaw');
     const ver = execSync(`"${cmd}" --version`, { timeout: 5000, encoding: 'utf8' }).trim();
@@ -183,6 +196,57 @@ function checkNetwork(url) {
     req.on('timeout', () => { req.destroy(); resolve(false); });
     req.end();
   });
+}
+
+function refreshEnvPath() {
+  const pathModule = require('path');
+  const fsModule = require('fs');
+
+  if (process.platform === 'win32') {
+    // Windows: 从注册表/PowerShell 读取最新系统 PATH
+    try {
+      const sysPath = execSync(
+        'powershell -Command "[Environment]::GetEnvironmentVariable(\'Path\',\'Machine\')"',
+        { encoding: 'utf8', timeout: 10000 }
+      ).trim();
+      const userPath = execSync(
+        'powershell -Command "[Environment]::GetEnvironmentVariable(\'Path\',\'User\')"',
+        { encoding: 'utf8', timeout: 10000 }
+      ).trim();
+      process.env.PATH = sysPath + ';' + userPath;
+      logger.info('检测前已刷新 PATH（PowerShell）');
+      return;
+    } catch {
+      logger.warn('PowerShell PATH 读取失败，尝试手动添加');
+    }
+
+    // 备选：添加常见 Node.js 安装路径
+    const commonPaths = [
+      'C:\\Program Files\\nodejs',
+      pathModule.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs'),
+      pathModule.join(process.env.LOCALAPPDATA || '', 'Programs', 'nodejs'),
+    ];
+    for (const p of commonPaths) {
+      if (p) {
+        try {
+          fsModule.accessSync(pathModule.join(p, 'node.exe'));
+          if (!process.env.PATH.toLowerCase().includes(p.toLowerCase())) {
+            process.env.PATH = p + ';' + process.env.PATH;
+            logger.info(`手动添加 ${p} 到 PATH`);
+          }
+        } catch {}
+      }
+    }
+  } else {
+    // macOS: 刷新 PATH
+    try {
+      const newPath = execSync('/usr/bin/env bash -lc "echo $PATH"', { encoding: 'utf8' }).trim();
+      if (newPath && newPath.includes('/')) {
+        process.env.PATH = newPath;
+        logger.info('检测前已刷新 PATH（macOS）');
+      }
+    } catch {}
+  }
 }
 
 module.exports = detect;
