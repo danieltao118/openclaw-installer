@@ -817,7 +817,11 @@ $('#btn-launch').addEventListener('click', async () => {
 });
 
 // 关闭安装器
-$('#btn-close').addEventListener('click', () => {
+$('#btn-close').addEventListener('click', async () => {
+  // 非U盘环境：关闭时自删 exe，防止泄露
+  try {
+    await window.installerAPI.selfDestruct();
+  } catch {}
   window.close();
 });
 

@@ -60,6 +60,24 @@ function createWindow() {
 
 app.whenReady().then(() => {
   portableLog('INFO', 'Electron: 应用启动', `便携模式: ${isPortableMode}`);
+
+  // 有效期检查
+  const versions = loadVersions();
+  if (versions.expiresAt) {
+    const expiry = new Date(versions.expiresAt + 'T23:59:59');
+    if (new Date() > expiry) {
+      const { dialog } = require('electron');
+      dialog.showMessageBoxSync({
+        type: 'error',
+        title: '安装器已过期',
+        message: `本安装器已于 ${versions.expiresAt} 过期。\n请联系工作人员获取新版安装器。`,
+        buttons: ['确定'],
+      });
+      app.quit();
+      return;
+    }
+  }
+
   createWindow();
 }).catch(err => {
   portableLog('ERROR', 'Electron: 窗口创建失败', err.message);
@@ -221,13 +239,12 @@ ipcMain.handle('get-log-tail', async () => {
 });
 
 // 激活码相关 IPC
-// 便携模式检测：Windows portable 设置 PORTABLE_EXECUTABLE_DIR，或存在 .portable 标记文件
+// 便携模式检测：只认 .portable 标记文件（由 prepare-usb.js 创建）
+// 不使用 PORTABLE_EXECUTABLE_DIR（electron-builder 总是设置，无法区分U盘和复制出去的 exe）
 const isPortableMode = (() => {
-  if (process.env.PORTABLE_EXECUTABLE_DIR) return true;
   try {
-    // 检查可执行文件同目录及上级目录的 .portable 标记
     const appDir = process.platform === 'darwin'
-      ? path.dirname(path.dirname(path.dirname(app.getAppPath()))) // macOS .app/Contents/Resources/app.asar
+      ? path.dirname(path.dirname(path.dirname(app.getAppPath())))
       : path.dirname(app.getPath('exe'));
     for (let dir = appDir; dir !== path.dirname(dir); dir = path.dirname(dir)) {
       if (fs.existsSync(path.join(dir, '.portable'))) return true;
@@ -241,6 +258,7 @@ ipcMain.handle('is-portable-mode', async () => {
 });
 
 ipcMain.handle('validate-activation', async (event, code) => {
+  // U盘环境免激活
   if (isPortableMode) {
     return { success: true, type: 'C', typeName: '便携版', days: 9999 };
   }
@@ -253,11 +271,42 @@ ipcMain.handle('validate-activation', async (event, code) => {
 });
 
 ipcMain.handle('check-activation', async (event) => {
+  // U盘环境免激活
   if (isPortableMode) {
     return { activated: true, type: 'C', typeName: '便携版', daysLeft: 9999, expiresAt: '2099-12-31' };
   }
   const activation = require('./scripts/activation');
   return activation.isActivated();
+});
+
+// 安装完成后自删（仅非U盘环境）
+// 防止 exe 被拷贝后反复使用或分享
+ipcMain.handle('self-destruct', async () => {
+  if (isPortableMode) {
+    // U盘环境不删
+    return { skipped: true, reason: 'U盘环境' };
+  }
+  try {
+    const exePath = app.getPath('exe');
+    // 开发环境跳过
+    if (exePath.includes('electron')) {
+      return { skipped: true, reason: '开发环境' };
+    }
+    // Windows: 用 cmd /c ping 延迟后删除（进程退出后才能删）
+    if (process.platform === 'win32') {
+      const { spawn } = require('child_process');
+      spawn('cmd', ['/c', `ping -n 3 127.0.0.1 >nul & del /f /q "${exePath}"`], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+      }).unref();
+      portableLog('INFO', `自删已调度: ${exePath}`);
+    }
+    return { scheduled: true, path: exePath };
+  } catch (err) {
+    portableLog('ERROR', `自删失败: ${err.message}`);
+    return { error: err.message };
+  }
 });
 
 ipcMain.handle('launch-openclaw', async (event) => {

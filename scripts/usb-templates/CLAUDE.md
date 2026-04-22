@@ -64,3 +64,30 @@ OC-T-xxxxxx-xxxxxx-XXXX-XXXXXX  （体验版 30天）
 
 （在此处追加每台电脑的问题记录）
 
+### [2026-04-22] 现场测试机
+- **问题**：安装器检测不到系统已安装的 Git；安装器可被用户反复使用/分享
+- **环境**：Windows 11 / Node v22 / Git v2.49 (系统) + v2.47 (便携)
+- **解法**：1. detect.js refreshEnvPath() 补充 Git 路径检测 ✅已改  2. 安装后自删+有效期(D方案) 待开发机实现
+- **源码修改**：detect.js 第254行后新增 gitPaths 数组
+
+### [待实现] 安装器分发控制（D方案：自删+有效期）
+- **问题**：用户可拷贝安装器 exe 反复使用或分享给他人
+- **方案**：
+  1. **有效期**：versions.json 加 `expiresAt` 字段，启动时检查（✅已加）
+  2. **自删**：只在非U盘环境下自删，关键逻辑：
+     - `app.getPath('exe')` 获取的是当前运行的 exe 路径
+     - 从U盘运行时 = `E:\OpenClaw-Portable.exe` → **不能删**，否则无法给下一个人安装
+     - 正确判断：检查 `isPortableMode`（U盘有 `.portable` 标记文件）
+     - `isPortableMode === true` → 跳过自删（在U盘上运行）
+     - `isPortableMode === false` → 自删（被拷贝到本地运行）
+     - 开发环境（路径含 electron）→ 跳过
+  3. 自删时机：安装+配置全部完成后，用户点「关闭」按钮时触发
+- **已改文件**：versions.json（加了 expiresAt），main.js（加了有效期检查，自删部分已回滚）
+- **待开发机完成**：自删 IPC handler + renderer.js 关闭按钮调用
+
+### [日期] [电脑编号/描述]
+- **问题**：xxx
+- **环境**：Windows xx / Node vxx / 杀毒 xxx
+- **解法**：xxx
+- **源码修改**：xxx（如有）
+

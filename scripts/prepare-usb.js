@@ -152,6 +152,10 @@ async function main() {
     console.log(`[目录] ${d}`);
   }
 
+  // 写入 .portable 标记文件（安装器通过此文件识别U盘环境，免激活码）
+  fs.writeFileSync(path.join(drive, '.portable'), new Date().toISOString(), 'utf8');
+  console.log(`[标记] .portable（U盘环境识别）`);
+
   // 5. 下载便携 Node.js
   const nodeZip = path.join(drive, 'portable-node', 'node.zip');
   const nodeExe = path.join(drive, 'portable-node', 'node.exe');

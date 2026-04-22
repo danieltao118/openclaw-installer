@@ -30,4 +30,6 @@ contextBridge.exposeInMainWorld('installerAPI', {
   // 反馈相关
   getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
   getLogTail: () => ipcRenderer.invoke('get-log-tail'),
+  // 自删（防泄露）
+  selfDestruct: () => ipcRenderer.invoke('self-destruct'),
 });
