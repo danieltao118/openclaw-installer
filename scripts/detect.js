@@ -75,15 +75,20 @@ async function detect(win, versions) {
 
   // 5. 检测 OpenClaw
   // OpenClaw 安装在 npm 全局目录，确保 npm 路径也在 PATH 中
-  if (process.platform === 'win32') {
-    try {
-      const npmGlobal = execSync('npm config get prefix', { timeout: 5000, encoding: 'utf8' }).trim();
-      if (npmGlobal && !process.env.PATH.toLowerCase().includes(npmGlobal.toLowerCase())) {
-        process.env.PATH = npmGlobal + ';' + process.env.PATH;
-        logger.info(`添加 npm 全局目录到 PATH: ${npmGlobal}`);
+  try {
+    const npmGlobal = execSync('npm config get prefix', { timeout: 5000, encoding: 'utf8' }).trim();
+    if (npmGlobal) {
+      const binSuffix = process.platform === 'win32' ? npmGlobal : npmGlobal + '/bin';
+      const pathHasIt = process.platform === 'win32'
+        ? process.env.PATH.toLowerCase().includes(npmGlobal.toLowerCase())
+        : process.env.PATH.includes(binSuffix) || process.env.PATH.includes(npmGlobal);
+      if (!pathHasIt) {
+        const sep = process.platform === 'win32' ? ';' : ':';
+        process.env.PATH = binSuffix + sep + process.env.PATH;
+        logger.info(`添加 npm 全局目录到 PATH: ${binSuffix}`);
       }
-    } catch {}
-  }
+    }
+  } catch {}
   try {
     const cmd = getCmd('openclaw');
     const ver = execSync(`"${cmd}" --version`, { timeout: 5000, encoding: 'utf8' }).trim();
@@ -245,6 +250,13 @@ function refreshEnvPath() {
         logger.info('检测前已刷新 PATH（macOS）');
       }
     } catch {}
+    // 确保常见路径在 PATH 中
+    const macPaths = ['/usr/local/bin', '/opt/homebrew/bin'];
+    for (const p of macPaths) {
+      if (!process.env.PATH.includes(p)) {
+        process.env.PATH = p + ':' + process.env.PATH;
+      }
+    }
   }
 }
 

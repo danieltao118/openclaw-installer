@@ -119,7 +119,7 @@ async function saveModelConfig(provider, apiKey, baseUrl, model) {
   try {
     const cmd = getCmd('openclaw');
     // 使用 --yes 跳过交互确认
-    execSync(`"${cmd}" config set agents.defaults.model.primary "${modelMap[provider]}" --yes 2>nul`, {
+    execSync(`"${cmd}" config set agents.defaults.model.primary "${modelMap[provider]}" --yes`, {
       timeout: 10000,
       encoding: 'utf8',
       stdio: 'pipe', // 静默输出，避免 stderr 报错干扰
@@ -154,7 +154,7 @@ async function saveChannelConfig(appId, appSecret) {
     const cmd = getCmd('openclaw');
     // openclaw channels add 命令格式可能不同版本有差异
     // 直接写入配置文件已足够，CLI 调用仅作为补充
-    execSync(`"${cmd}" configure --section channels --yes 2>nul`, {
+    execSync(`"${cmd}" configure --section channels --yes`, {
       timeout: 15000,
       encoding: 'utf8',
       stdio: 'pipe',

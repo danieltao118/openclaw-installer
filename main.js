@@ -248,41 +248,88 @@ ipcMain.handle('check-activation', async (event) => {
 });
 
 ipcMain.handle('launch-openclaw', async (event) => {
-  const { spawn } = require('child_process');
+  const { spawn, execSync } = require('child_process');
   const { shell } = require('electron');
   const crypto = require('crypto');
   const logger = require('./scripts/logger');
   try {
     const cmd = getCmd('openclaw');
 
-    // 生成随机 token
-    const token = crypto.randomBytes(16).toString('hex');
-    logger.info(`生成 gateway token: ${token.substring(0, 8)}...`);
-
-    // 后台启动 gateway，传入 token
-    const child = spawn(cmd, ['gateway', 'run', '--allow-unconfigured', '--token', token], {
-      detached: true,
-      stdio: 'ignore',
-      shell: process.platform === 'win32',
-      windowsHide: true,
-      env: { ...process.env },
-    });
-    child.on('error', (err) => {
-      logger.error(`启动 OpenClaw 失败: ${err.message}`);
-    });
-    child.unref();
-    logger.info('Gateway 进程已启动');
-
-    // 等待 gateway 就绪
-    const ready = await waitForGateway(15);
-    if (ready) {
-      const dashboardUrl = `http://127.0.0.1:18789/#token=${encodeURIComponent(token)}`;
-      logger.info(`打开 Dashboard: ${dashboardUrl.substring(0, 50)}...`);
-      await shell.openExternal(dashboardUrl);
-    } else {
-      logger.info('Gateway 等待超时，打开默认地址');
-      await shell.openExternal('http://127.0.0.1:18789');
+    // macOS: 确保 npm 全局路径在 PATH 中
+    if (process.platform !== 'win32') {
+      try {
+        const prefix = require('child_process').execSync('npm config get prefix', { encoding: 'utf8', timeout: 5000 }).trim();
+        const binDir = prefix + '/bin';
+        if (!process.env.PATH.includes(binDir) && !process.env.PATH.includes(prefix)) {
+          process.env.PATH = binDir + ':' + process.env.PATH;
+        }
+      } catch {}
     }
+
+    // Token 复用：从文件读取，没有则生成新的
+    const tokenPath = path.join(os.homedir(), '.openclaw', 'gateway-token');
+    let token;
+    try {
+      token = fs.readFileSync(tokenPath, 'utf8').trim();
+      logger.info(`复用已有 token: ${token.substring(0, 8)}...`);
+    } catch {
+      token = crypto.randomBytes(16).toString('hex');
+      fs.mkdirSync(path.dirname(tokenPath), { recursive: true });
+      fs.writeFileSync(tokenPath, token, 'utf8');
+      logger.info(`生成新 token: ${token.substring(0, 8)}...`);
+    }
+
+    // 先检查 gateway 是否已经在运行
+    const alreadyRunning = await checkGatewayHealth();
+    if (alreadyRunning) {
+      logger.info('Gateway 已在运行，直接打开 Dashboard');
+    } else {
+      // 杀掉占用端口的旧进程
+      if (process.platform === 'win32') {
+        try {
+          const out = execSync('netstat -ano | findstr :18789 | findstr LISTENING', { encoding: 'utf8', timeout: 5000 });
+          const pid = out.trim().match(/\s+(\d+)\s*$/)?.[1];
+          if (pid) { execSync(`taskkill /F /PID ${pid}`, { timeout: 5000 }); logger.info(`杀掉旧 gateway PID: ${pid}`); }
+        } catch {}
+      } else {
+        // macOS/Linux: 用 lsof 找到占用端口的进程
+        try {
+          const out = execSync('lsof -ti:18789', { encoding: 'utf8', timeout: 5000 }).trim();
+          if (out) {
+            const pids = out.split('\n').filter(Boolean);
+            for (const pid of pids) {
+              execSync(`kill -9 ${pid}`, { timeout: 5000 });
+              logger.info(`杀掉旧 gateway PID: ${pid}`);
+            }
+          }
+        } catch {}
+      }
+
+      // 启动 gateway（detached 让它在安装器关闭后继续运行）
+      const child = spawn(cmd, ['gateway', 'run', '--allow-unconfigured', '--token', token], {
+        detached: true,
+        stdio: 'ignore',
+        shell: process.platform === 'win32',
+        windowsHide: true,
+        env: { ...process.env },
+      });
+      child.on('error', (err) => {
+        logger.error(`启动 OpenClaw 失败: ${err.message}`);
+      });
+      child.unref();
+      logger.info(`Gateway 进程已启动 PID: ${child.pid}`);
+
+      // 等待 gateway 就绪（最多60秒，每2秒检查一次）
+      const ready = await waitForGateway(30, 2000);
+      if (!ready) {
+        return { success: false, error: 'Gateway 启动超时（60秒），请稍后重试' };
+      }
+    }
+
+    // 打开带 token 的 Dashboard
+    const dashboardUrl = `http://127.0.0.1:18789/#token=${encodeURIComponent(token)}`;
+    logger.info(`打开 Dashboard: ${dashboardUrl.substring(0, 50)}...`);
+    await shell.openExternal(dashboardUrl);
 
     return { success: true };
   } catch (err) {
@@ -291,24 +338,30 @@ ipcMain.handle('launch-openclaw', async (event) => {
   }
 });
 
-// 等待 gateway 就绪
-async function waitForGateway(maxRetries) {
+// 检查 gateway 是否已在运行
+async function checkGatewayHealth() {
   const http = require('http');
-  for (let i = 0; i < maxRetries; i++) {
-    await new Promise(r => setTimeout(r, 1500));
-    try {
-      await new Promise((resolve, reject) => {
-        const req = http.get('http://127.0.0.1:18789/', { timeout: 3000 }, (res) => {
-          res.resume();
-          resolve(true);
+  try {
+    return await new Promise((resolve) => {
+      const req = http.get('http://127.0.0.1:18789/health', { timeout: 3000 }, (res) => {
+        let data = '';
+        res.on('data', (c) => { data += c; });
+        res.on('end', () => {
+          try { resolve(JSON.parse(data).ok === true); } catch { resolve(false); }
         });
-        req.on('error', reject);
-        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
       });
-      return true;
-    } catch {
-      // 还没就绪，继续等待
-    }
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => { req.destroy(); resolve(false); });
+    });
+  } catch { return false; }
+}
+
+// 等待 gateway 就绪
+async function waitForGateway(maxRetries, intervalMs) {
+  for (let i = 0; i < maxRetries; i++) {
+    await new Promise(r => setTimeout(r, intervalMs || 2000));
+    const ok = await checkGatewayHealth();
+    if (ok) return true;
   }
   return false;
 }

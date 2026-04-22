@@ -255,21 +255,35 @@ async function main() {
 
   console.log('  密码和凭证已加密存储');
 
-  // 9. 写入 CLAUDE.md 和 launcher.js
+  // 9. 写入启动脚本
   console.log('\n[文件] 写入启动脚本...');
   const templatesDir = path.join(__dirname, 'usb-templates');
-  const batFiles = ['start.bat', 'run-claude.bat', 'start-installer.bat', 'launcher.js'];
-  for (const f of batFiles) {
+  // 根目录文件: start.bat, diagnose.bat
+  const rootFiles = ['start.bat', 'diagnose.bat'];
+  for (const f of rootFiles) {
     const src = path.join(templatesDir, f);
     const dst = path.join(drive, f);
     if (fs.existsSync(src)) {
-      let content = fs.readFileSync(src);
-      // .bat 文件必须用 UTF-8 + CRLF 换行符
+      let content = fs.readFileSync(src, 'utf8');
+      content = content.replace(/(?<!\r)\n/g, '\r\n');
+      fs.writeFileSync(dst, content, 'utf8');
+      console.log(`  ${f} (root)`);
+    }
+  }
+  // tools/ 目录文件: 所有辅助脚本
+  const toolsDir = path.join(drive, 'tools');
+  if (!fs.existsSync(toolsDir)) fs.mkdirSync(toolsDir, { recursive: true });
+  const toolsFiles = ['run-claude.bat', 'start-installer.bat', 'repair-env.bat', 'launcher.js', 'verify-password.js', 'usb-logger.js', 'repair-env.js'];
+  for (const f of toolsFiles) {
+    const src = path.join(templatesDir, f);
+    const dst = path.join(toolsDir, f);
+    if (fs.existsSync(src)) {
+      let content = fs.readFileSync(src, 'utf8');
       if (f.endsWith('.bat')) {
-        content = Buffer.from(content.toString('utf8').replace(/(?<!\r)\n/g, '\r\n'), 'utf8');
+        content = content.replace(/(?<!\r)\n/g, '\r\n');
       }
-      fs.writeFileSync(dst, content);
-      console.log(`  ${f}`);
+      fs.writeFileSync(dst, content, 'utf8');
+      console.log(`  tools/${f}`);
     }
   }
 

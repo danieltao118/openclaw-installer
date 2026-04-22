@@ -197,27 +197,37 @@ function runNpmInstall(win, bundledTgz) {
 }
 
 function killOpenclawProcesses() {
-  if (process.platform !== 'win32') return;
   try {
-    const output = execSync('tasklist /FO CSV /NH', { encoding: 'utf8', timeout: 10000 });
-    const pids = [];
-    output.split('\n').forEach(line => {
-      const match = line.match(/"([^"]+)","(\d+)"/);
-      if (match) {
-        const name = match[1].toLowerCase();
-        if (name === 'openclaw.exe' || name === 'node.exe' && line.toLowerCase().includes('openclaw')) {
-          pids.push(match[2]);
+    if (process.platform === 'win32') {
+      const output = execSync('tasklist /FO CSV /NH', { encoding: 'utf8', timeout: 10000 });
+      const pids = [];
+      output.split('\n').forEach(line => {
+        const match = line.match(/"([^"]+)","(\d+)"/);
+        if (match) {
+          const name = match[1].toLowerCase();
+          if (name === 'openclaw.exe' || name === 'node.exe' && line.toLowerCase().includes('openclaw')) {
+            pids.push(match[2]);
+          }
+        }
+      });
+      if (pids.length > 0) {
+        logger.info(`关闭 OpenClaw 进程: PID ${pids.join(', ')}`);
+        execSync(`taskkill /F /PID ${pids.join(' /PID ')}`, { timeout: 10000 });
+        const start = Date.now();
+        while (Date.now() - start < 3000) {
+          try { execSync('tasklist /FI "IMAGENAME eq openclaw.exe" /NH', { encoding: 'utf8', timeout: 5000 }); } catch { break; }
         }
       }
-    });
-    if (pids.length > 0) {
-      logger.info(`关闭 OpenClaw 进程: PID ${pids.join(', ')}`);
-      execSync(`taskkill /F /PID ${pids.join(' /PID ')}`, { timeout: 10000 });
-      // 等待进程完全退出、文件释放
-      const start = Date.now();
-      while (Date.now() - start < 3000) {
-        try { execSync('tasklist /FI "IMAGENAME eq openclaw.exe" /NH', { encoding: 'utf8', timeout: 5000 }); } catch { break; }
-      }
+    } else {
+      // macOS/Linux: 用 pkill 关闭 openclaw gateway 进程
+      try {
+        const out = execSync('pgrep -f "openclaw gateway" || true', { encoding: 'utf8', timeout: 5000 }).trim();
+        if (out) {
+          logger.info(`关闭 OpenClaw 进程: PID ${out.replace(/\n/g, ', ')}`);
+          execSync('pkill -f "openclaw gateway"', { timeout: 5000 });
+          setTimeout(() => {}, 2000);
+        }
+      } catch {}
     }
   } catch (err) {
     logger.warn(`关闭进程失败（可忽略）: ${err.message}`);
@@ -229,20 +239,30 @@ function sleep(ms) {
 }
 
 function ensureNpmGlobalDir() {
-  // Windows 上 npm 全局安装目录可能不存在，需要手动创建
-  if (process.platform !== 'win32') return;
-  const appData = process.env.APPDATA;
-  if (!appData) return;
-  const npmDir = path.join(appData, 'npm');
-  if (!fs.existsSync(npmDir)) {
-    fs.mkdirSync(npmDir, { recursive: true });
-    logger.info(`创建 npm 全局目录: ${npmDir}`);
-  }
-  // 确保 npm\node_modules 也存在
-  const nmDir = path.join(npmDir, 'node_modules');
-  if (!fs.existsSync(nmDir)) {
-    fs.mkdirSync(nmDir, { recursive: true });
-    logger.info(`创建 node_modules 目录: ${nmDir}`);
+  if (process.platform === 'win32') {
+    // Windows 上 npm 全局安装目录可能不存在，需要手动创建
+    const appData = process.env.APPDATA;
+    if (!appData) return;
+    const npmDir = path.join(appData, 'npm');
+    if (!fs.existsSync(npmDir)) {
+      fs.mkdirSync(npmDir, { recursive: true });
+      logger.info(`创建 npm 全局目录: ${npmDir}`);
+    }
+    const nmDir = path.join(npmDir, 'node_modules');
+    if (!fs.existsSync(nmDir)) {
+      fs.mkdirSync(nmDir, { recursive: true });
+      logger.info(`创建 node_modules 目录: ${nmDir}`);
+    }
+  } else {
+    // macOS/Linux: 确保 npm 全局 bin 目录存在
+    try {
+      const prefix = execSync('npm config get prefix', { encoding: 'utf8', timeout: 5000 }).trim();
+      const binDir = path.join(prefix, 'bin');
+      if (!fs.existsSync(binDir)) {
+        fs.mkdirSync(binDir, { recursive: true });
+        logger.info(`创建 npm bin 目录: ${binDir}`);
+      }
+    } catch {}
   }
 }
 

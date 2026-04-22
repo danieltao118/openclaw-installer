@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-const versions = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'versions.json'), 'utf8'));
+const versions = require('./load-versions');
 const NODE_VERSION = versions.node;
 const OPENCLAW_VERSION = versions.openclaw;
 

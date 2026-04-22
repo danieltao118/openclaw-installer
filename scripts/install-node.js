@@ -6,7 +6,7 @@ const os = require('os');
 const https = require('https');
 const logger = require('./logger');
 
-const versions = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'versions.json'), 'utf8'));
+const versions = require('./load-versions');
 const NODE_VERSION = versions.node;
 const NODE_BASE_URL = `https://nodejs.org/dist/v${NODE_VERSION}/`;
 
@@ -219,12 +219,20 @@ function installWindowsMsi(msiPath, win) {
     });
 
     child.on('close', (code) => {
-      if (code === 0) {
-        logger.info('msiexec 安装成功');
+      if (code === 0 || code === 3010) {
+        logger.info(`msiexec 安装成功 (退出码: ${code})`);
         resolve();
+      } else if (code === 1603) {
+        logger.info('MSI 1603, retrying with PowerShell elevation...');
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('install-progress', {
+            message: '需要管理员权限安装 Node.js，请在弹窗中点击"是"...',
+          });
+        }
+        elevateMsi(msiPath).then(resolve).catch(reject);
       } else {
         logger.error(`msiexec 退出码: ${code}, stderr: ${stderr}`);
-        reject(new Error(`Node.js 安装失败 (退出码: ${code})。请尝试关闭杀毒软件后重试。`));
+        reject(new Error(`Node.js 安装失败 (退出码: ${code})。请关闭杀毒软件后重试。`));
       }
     });
 
@@ -232,6 +240,23 @@ function installWindowsMsi(msiPath, win) {
       logger.error(`msiexec 执行错误: ${err.message}`);
       reject(new Error(`无法执行安装程序: ${err.message}`));
     });
+  });
+}
+
+function elevateMsi(msiPath) {
+  return new Promise((resolve, reject) => {
+    // 用 PowerShell Start-Process -Verb RunAs 只提权 msiexec
+    const args = `/i "${msiPath}" /qn /norestart`;
+    const cmd = `powershell -Command "Start-Process msiexec -ArgumentList '${args}' -Verb RunAs -Wait"`;
+    logger.info('Elevating msiexec via PowerShell...');
+    try {
+      execSync(cmd, { timeout: 300000 });
+      logger.info('Elevated MSI install completed');
+      resolve();
+    } catch (err) {
+      logger.error(`Elevation failed: ${err.message}`);
+      reject(new Error('需要管理员权限。请右键安装器 → 以管理员身份运行。'));
+    }
   });
 }
 

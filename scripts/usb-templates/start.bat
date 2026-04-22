@@ -1,49 +1,78 @@
 @echo off
-chcp 65001 >nul
-title OpenClaw 技术支持工具盘
+:: Anti flash-close
+if "%~1"=="" (
+    cmd /c "%~f0" _pinned
+    if errorlevel 1 pause
+    exit /b
+)
+
+chcp 65001 >nul 2>&1
+setlocal EnableDelayedExpansion
+title Claude Code (Tech Support)
+
 set "USB_ROOT=%~dp0"
+set "TOOLS=%USB_ROOT%tools"
+set "NODE_EXE=%USB_ROOT%portable-node\node.exe"
 
-:: ========== 密码验证 ==========
-set "KEYFILE=%USB_ROOT%.guard\key.dat"
-if not exist "%KEYFILE%" (
-    echo [错误] U盘未初始化，请先运行 prepare-usb 脚本。
-    pause & exit /b
+:: ========== Check ==========
+if not exist "%USB_ROOT%.guard\key.dat" (
+    echo.
+    echo  [ERROR] USB not initialized.
+    echo.
+    pause & exit /b 1
 )
 
-echo.
-echo ==========================================
-echo   OpenClaw 技术支持工具盘
-echo   行知商学 · 教培AI实战营
-echo ==========================================
-echo.
-set /p "PASS=请输入管理员密码: "
-
-:: 用 Node.js 验证密码（密码通过临时文件传入，避免命令行暴露）
-set "TMPPASS=%TEMP%\oclaw_verify_%RANDOM%.tmp"
-echo %PASS%> "%TMPPASS%"
-if exist "%USB_ROOT%portable-node\node.exe" (
-    "%USB_ROOT%portable-node\node.exe" -e "const fs=require('fs');const crypto=require('crypto');try{const k=fs.readFileSync(process.argv[1],'utf8').trim();const p=fs.readFileSync(process.argv[2],'utf8').trim();const h=crypto.createHash('sha256').update(p).digest('hex');fs.unlinkSync(process.argv[2]);process.exit(h===k?0:1)}catch(e){try{fs.unlinkSync(process.argv[2])}catch{}process.exit(1)}" "%KEYFILE%" "%TMPPASS%"
-) else (
-    node -e "const fs=require('fs');const crypto=require('crypto');try{const k=fs.readFileSync(process.argv[1],'utf8').trim();const p=fs.readFileSync(process.argv[2],'utf8').trim();const h=crypto.createHash('sha256').update(p).digest('hex');fs.unlinkSync(process.argv[2]);process.exit(h===k?0:1)}catch(e){try{fs.unlinkSync(process.argv[2])}catch{}process.exit(1)}" "%KEYFILE%" "%TMPPASS%"
+if not exist "%NODE_EXE%" (
+    echo.
+    echo  [ERROR] Portable Node.js not found.
+    echo.
+    pause & exit /b 1
 )
 
+if exist "%NODE_EXE%" "%NODE_EXE%" "%TOOLS%\usb-logger.js" INFO "start.bat launched" "PC: %COMPUTERNAME%"
+
+echo.
+echo  ==========================================
+echo    Claude Code - Tech Support Mode
+echo    teach-AI bootcamp
+echo  ==========================================
+echo.
+
+:: ========== Password (PowerShell hidden) ==========
+set "TMPPASS=%TEMP%\oclaw_%RANDOM%.tmp"
+powershell -NoProfile -Command "$p = Read-Host -Prompt 'Password' -AsSecureString; $b = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($p); $s = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($b); [System.IO.File]::WriteAllText('%TMPPASS%', $s, [System.Text.Encoding]::UTF8)" 2>nul
+
+if not exist "%TMPPASS%" (
+    echo  [WARNING] PowerShell unavailable.
+    set /p "PASS=Password: "
+    echo !PASS!> "%TMPPASS%"
+    set "PASS="
+)
+
+if not exist "%TMPPASS%" (
+    echo.
+    echo  [ERROR] Password input failed.
+    pause & exit /b 1
+)
+
+:: ========== Verify ==========
+"%NODE_EXE%" "%TOOLS%\verify-password.js" "%USB_ROOT%.guard\key.dat" "%TMPPASS%"
 if errorlevel 1 (
     echo.
-    echo [错误] 密码错误。
-    pause & exit /b
+    echo  [ERROR] Wrong password.
+    if exist "%TMPPASS%" del "%TMPPASS%" 2>nul
+    pause & exit /b 1
 )
 
-echo.
-echo   [1] 安装 OpenClaw
-echo   [2] 启动 Claude Code（技术支持）
-echo   [3] 退出
-echo.
-set /p "choice=请选择: "
+if exist "%NODE_EXE%" "%NODE_EXE%" "%TOOLS%\usb-logger.js" INFO "password verified"
 
-if "%choice%"=="1" call "%USB_ROOT%start-installer.bat"
-if "%choice%"=="2" call "%USB_ROOT%run-claude.bat" "%PASS%"
-if "%choice%"=="3" exit /b
+:: ========== Launch Claude Code ==========
+if exist "%NODE_EXE%" "%NODE_EXE%" "%TOOLS%\usb-logger.js" INFO "launching Claude Code"
 
-:: 清除密码
-set "PASS="
+"%NODE_EXE%" "%TOOLS%\launcher.js" "%TMPPASS%"
+
+:: ========== Cleanup ==========
+if exist "%TMPPASS%" del "%TMPPASS%" 2>nul
+if exist "%NODE_EXE%" "%NODE_EXE%" "%TOOLS%\usb-logger.js" INFO "start.bat ended"
+echo.
 pause

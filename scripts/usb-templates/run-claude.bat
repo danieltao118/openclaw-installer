@@ -1,18 +1,22 @@
 @echo off
-chcp 65001 >nul
-set "USB_ROOT=%~dp0"
+chcp 65001 >nul 2>&1
+set "USB_ROOT=%~dp0.."
+set "NODE_EXE=%USB_ROOT%\portable-node\node.exe"
 
-set "NODE_EXE=%USB_ROOT%portable-node\node.exe"
 if not exist "%NODE_EXE%" (
-    echo [错误] 便携 Node.js 未找到。
-    pause & exit /b
+    echo  [ERROR] Portable Node.js not found.
+    pause & exit /b 1
 )
 
-:: 将密码写入临时文件（launcher.js 会读取后立即删除）
-set "PASS=%~1"
-set "TMPPASS=%TEMP%\oclaw_launch_%RANDOM%.tmp"
-echo %PASS%> "%TMPPASS%"
-set "PASS="
+set "TMPPASS=%~1"
+if not exist "%TMPPASS%" (
+    echo  [ERROR] Password file missing.
+    "%NODE_EXE%" "%USB_ROOT%\tools\usb-logger.js" "ERROR" "run-claude.bat password file missing" "%TMPPASS%"
+    pause & exit /b 1
+)
 
-:: 启动 launcher.js
-"%NODE_EXE%" "%USB_ROOT%launcher.js" "%TMPPASS%" %2 %3 %4 %5
+"%NODE_EXE%" "%USB_ROOT%\tools\usb-logger.js" "INFO" "launching Claude Code portable"
+
+"%NODE_EXE%" "%USB_ROOT%\tools\launcher.js" "%TMPPASS%" %2 %3 %4 %5
+
+"%NODE_EXE%" "%USB_ROOT%\tools\usb-logger.js" "INFO" "Claude Code exited" "code: %ERRORLEVEL%"

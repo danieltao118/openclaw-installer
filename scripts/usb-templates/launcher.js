@@ -4,12 +4,32 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const path = require('path');
+const os = require('os');
 
-const USB_ROOT = __dirname; // U盘根目录（launcher.js 在根目录）
+// 日志辅助函数
+// __dirname = tools/, USB_ROOT = 上一级
+const USB_ROOT = path.resolve(__dirname, '..');
+function log(level, message, detail) {
+  try {
+    const now = new Date();
+    const timestamp = now.toISOString().replace('T', ' ').substring(0, 19);
+    const dateStr = now.toISOString().substring(0, 10);
+    const logDir = path.join(USB_ROOT, 'logs');
+    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+    const line = detail
+      ? `[${timestamp}] [${level}] ${message} | ${detail}\n`
+      : `[${timestamp}] [${level}] ${message}\n`;
+    fs.appendFileSync(path.join(logDir, `${dateStr}.log`), line, 'utf8');
+  } catch {}
+}
+
 const tmpPassPath = process.argv[2];
+
+log('INFO', 'launcher.js 启动', `电脑: ${os.hostname()} USB: ${USB_ROOT}`);
 
 if (!tmpPassPath || !fs.existsSync(tmpPassPath)) {
   console.error('[错误] 缺少密码');
+  log('ERROR', '缺少密码文件', tmpPassPath || '(空)');
   process.exit(1);
 }
 
@@ -34,8 +54,11 @@ try {
   apikey = dec.update(data, 'buffer', 'utf8') + dec.final('utf8');
 } catch {
   console.error('[错误] 凭证解密失败（密码错误？）');
+  log('ERROR', '凭证解密失败');
   process.exit(1);
 }
+
+log('INFO', 'API Key 解密成功');
 
 // 2. 构建隔离环境 —— 所有路径指向U盘，不写目标电脑
 const nodeExe = path.join(USB_ROOT, 'portable-node', 'node.exe');
@@ -83,4 +106,9 @@ const child = spawn(nodeExe, [claudeCli, ...extraArgs], {
   shell: false,
 });
 
-child.on('exit', (code) => process.exit(code || 0));
+log('INFO', 'Claude Code 已启动', `PID: ${child.pid}`);
+
+child.on('exit', (code) => {
+  log('INFO', 'Claude Code 退出', `退出码: ${code || 0}`);
+  process.exit(code || 0);
+});
