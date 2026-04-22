@@ -167,7 +167,8 @@ async function main() {
       console.error(`  失败: ${err.message}`);
       // 删除不完整的文件
       try { fs.unlinkSync(destPath); } catch {}
-      process.exitCode = 1;
+      // 不退出，允许部分文件缺失（CI 的 macOS Git .pkg 可能在 SourceForge 下载失败）
+      console.error(`  [警告] ${item.file} 下载失败，如果本地已有则不影响构建`);
     }
   }
 

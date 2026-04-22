@@ -1,4 +1,4 @@
-name: 构建和测试 OpenClaw 安装器
+name: 构建 macOS 安装器
 
 on:
   push:
@@ -8,14 +8,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ===== 第一步: 所有平台运行自动化测试 =====
+  # ===== 第一步: 测试 =====
   test:
     strategy:
-      fail-fast: false # 不因一个平台失败而取消其他平台
+      fail-fast: false
       matrix:
         include:
-          - os: windows-latest
-            label: Windows x64
           - os: macos-latest
             label: macOS M芯片
           - os: macos-14
@@ -34,23 +32,11 @@ jobs:
       - name: 运行自动化测试
         run: npm test
 
-  # ===== 第二步: 打包安装包 =====
+  # ===== 第二步: 打包 macOS =====
   build:
     needs: test
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            build_cmd: npm run build:win
-            artifact: windows-installer
-            label: Windows x64
-          - os: macos-latest
-            build_cmd: npm run build:mac
-            artifact: macos-installer
-            label: macOS (ARM64 + Intel)
-    runs-on: ${{ matrix.os }}
-    name: 打包 (${{ matrix.label }})
+    runs-on: macos-latest
+    name: 打包 macOS (ARM64 + Intel)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -66,7 +52,7 @@ jobs:
           DOWNLOAD_ALL: 1
 
       - name: 打包安装包
-        run: ${{ matrix.build_cmd }}
+        run: npm run build:mac
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
@@ -74,39 +60,8 @@ jobs:
       - name: 上传安装包
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
+          name: macos-installer
           path: |
-            dist/*.exe
             dist/*.dmg
             dist/*.zip
           retention-days: 30
-
-  # ===== 第三步: 验证 =====
-  verify:
-    needs: build
-    runs-on: ubuntu-latest
-    name: 验证所有平台安装包
-    steps:
-      - name: 下载 Windows 安装包
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-installer
-          path: artifacts/windows/
-
-      - name: 下载 macOS 安装包
-        uses: actions/download-artifact@v4
-        with:
-          name: macos-installer
-          path: artifacts/macos/
-
-      - name: 检查所有安装包
-        run: |
-          echo "=== Windows 安装包 ==="
-          ls -lh artifacts/windows/ || echo "未找到"
-          echo ""
-          echo "=== macOS 安装包 (ARM64 + Intel) ==="
-          ls -lh artifacts/macos/ || echo "未找到"
-          echo ""
-          echo "=== 汇总 ==="
-          TOTAL=$(find artifacts/ -type f | wc -l)
-          echo "安装包总数: ${TOTAL}"
