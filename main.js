@@ -50,7 +50,7 @@ function createWindow() {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': ["default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"],
+        'Content-Security-Policy': ["default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://activate.jiaopeiclaw.com"],
       },
     });
   });
@@ -129,6 +129,19 @@ ipcMain.handle('install-node', async (event) => {
     return result;
   } catch (err) {
     portableLog('ERROR', 'Electron: Node.js 安装失败', err.message);
+    throw err;
+  }
+});
+
+ipcMain.handle('install-git', async (event) => {
+  try {
+    portableLog('INFO', 'Electron: 开始安装 Git');
+    const installGit = require('./scripts/install-git');
+    const result = await installGit(mainWindow);
+    portableLog('INFO', 'Electron: Git 安装完成');
+    return result;
+  } catch (err) {
+    portableLog('ERROR', 'Electron: Git 安装失败', err.message);
     throw err;
   }
 });

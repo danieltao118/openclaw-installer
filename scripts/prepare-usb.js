@@ -200,6 +200,34 @@ async function main() {
     console.log('[跳过] Node.js 便携版已存在');
   }
 
+  // 5.5 便携 Git（Claude Code Windows 必需）
+  const gitBash = path.join(drive, 'portable-git', 'bin', 'bash.exe');
+  if (!fs.existsSync(gitBash)) {
+    console.log('\n[安装] 便携 Git (MinGit + bash)...');
+    // 尝试从 bundled/ 复制
+    const mingitZip = path.join(__dirname, '..', 'bundled', 'MinGit-2.47.1-64-bit.zip');
+    if (fs.existsSync(mingitZip)) {
+      const gitDir = path.join(drive, 'portable-git');
+      execSync(`powershell -Command "Expand-Archive -Path '${mingitZip}' -DestinationPath '${gitDir}' -Force"`, { timeout: 120000 });
+      // 复制 bash.exe + sh.exe（MinGit 不包含 bash，需从系统 Git 补充）
+      const sysGitBash = path.join(process.env.ProgramFiles || '', 'Git', 'usr', 'bin', 'bash.exe');
+      const sysGitSh = path.join(process.env.ProgramFiles || '', 'Git', 'usr', 'bin', 'sh.exe');
+      const altBash = 'D:/ProgramData/Git/usr/bin/bash.exe';
+      const altSh = 'D:/ProgramData/Git/usr/bin/sh.exe';
+      for (const [src, name] of [[sysGitBash, 'bash.exe'], [sysGitSh, 'sh.exe'], [altBash, 'bash.exe'], [altSh, 'sh.exe']]) {
+        if (fs.existsSync(src) && !fs.existsSync(path.join(gitDir, 'usr', 'bin', name))) {
+          fs.copyFileSync(src, path.join(gitDir, 'usr', 'bin', name));
+        }
+      }
+      console.log('  MinGit + bash 解压完成');
+    } else {
+      console.log('  跳过: MinGit zip 不存在，请手动下载放到 bundled/ 目录');
+      console.log('  下载: https://registry.npmmirror.com/-/binary/git-for-windows/v2.47.1.windows.1/MinGit-2.47.1-64-bit.zip');
+    }
+  } else {
+    console.log('[跳过] 便携 Git 已存在');
+  }
+
   // 6. 安装 Claude Code
   const claudeEntry = path.join(drive, 'claude-portable', 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js');
   if (!fs.existsSync(claudeEntry)) {
@@ -297,7 +325,14 @@ async function main() {
   // 10. 写入 settings.json
   const settings = {
     permissions: {
-      allow: ['Bash(npm *)', 'Bash(node *)', 'Bash(openclaw *)', 'Bash(dir *)', 'Bash(where *)', 'Bash(tasklist *)', 'Read', 'Write', 'Edit', 'Glob', 'Grep'],
+      allow: [
+        'Bash(npm *)', 'Bash(node *)', 'Bash(npx *)', 'Bash(openclaw *)',
+        'Bash(dir *)', 'Bash(where *)', 'Bash(tasklist *)', 'Bash(type *)',
+        'Bash(echo *)', 'Bash(set *)', 'Bash(cd *)', 'Bash(cls *)',
+        'Bash(curl *)', 'Bash(ping *)', 'Bash(ipconfig *)',
+        'Bash(git *)', 'Bash(cmd *)',
+        'Read', 'Write', 'Edit', 'Glob', 'Grep',
+      ],
     },
   };
   fs.writeFileSync(
@@ -306,6 +341,66 @@ async function main() {
     'utf8'
   );
   console.log('  settings.json');
+
+  // 11. macOS 便携 Claude Code 支持
+  console.log('\n[文件] macOS 便携 Claude Code...');
+  const macDir = path.join(drive, 'macOS');
+  if (!fs.existsSync(macDir)) fs.mkdirSync(macDir, { recursive: true });
+
+  // Node.js tarballs（从 bundled/ 复制，重命名为短文件名）
+  const macNodeFiles = [
+    ['node-v22.22.2-darwin-arm64.tar.gz', 'node-darwin-arm64.tar.gz'],
+    ['node-v22.22.2-darwin-x64.tar.gz', 'node-darwin-x64.tar.gz'],
+  ];
+  for (const [srcName, dstName] of macNodeFiles) {
+    const src = path.join(__dirname, '..', 'bundled', srcName);
+    const dst = path.join(macDir, dstName);
+    if (fs.existsSync(src)) {
+      if (!fs.existsSync(dst)) fs.copyFileSync(src, dst);
+      console.log(`  macOS/${dstName} (${(fs.statSync(dst).size / 1024 / 1024).toFixed(0)}MB)`);
+    } else {
+      console.log(`  macOS/${dstName} 源文件不存在，跳过`);
+    }
+  }
+
+  // openclaw.tgz
+  const oclawSrc = path.join(__dirname, '..', 'bundled', 'openclaw-2026.4.15.tgz');
+  const oclawDst = path.join(macDir, 'openclaw.tgz');
+  if (fs.existsSync(oclawSrc) && !fs.existsSync(oclawDst)) {
+    fs.copyFileSync(oclawSrc, oclawDst);
+    console.log('  macOS/openclaw.tgz');
+  } else if (fs.existsSync(oclawDst)) {
+    console.log('  macOS/openclaw.tgz OK');
+  }
+
+  // macOS 模板脚本
+  const macTemplates = [
+    'start-claude.command', 'diagnose-mac.command', 'launcher-mac.js',
+    'install-mac.command', 'start-mac.command',
+  ];
+  for (const f of macTemplates) {
+    const src = path.join(templatesDir, f);
+    const dst = path.join(macDir, f);
+    if (fs.existsSync(src)) {
+      fs.copyFileSync(src, dst);
+      console.log(`  macOS/${f}`);
+    }
+  }
+
+  // macOS Git .pkg（离线安装，Intel 版通过 Rosetta 兼容 M芯片）
+  const macGitFiles = [
+    ['git-mac.pkg', 'git-mac.pkg'],
+  ];
+  for (const [srcName, dstName] of macGitFiles) {
+    const src = path.join(__dirname, '..', 'bundled', srcName);
+    const dst = path.join(macDir, dstName);
+    if (fs.existsSync(src)) {
+      if (!fs.existsSync(dst)) fs.copyFileSync(src, dst);
+      console.log(`  macOS/${dstName} (${(fs.statSync(dst).size / 1024 / 1024).toFixed(0)}MB)`);
+    } else {
+      console.log(`  macOS/${dstName} 缺失（需手动下载 macOS git .pkg）`);
+    }
+  }
 
   // 完成
   console.log('\n=== 制作完成 ===');
@@ -320,9 +415,9 @@ async function main() {
   } catch {}
 
   console.log('\n使用方式:');
-  console.log('  1. 双击 start.bat → 输入密码');
-  console.log('  2. 选 [1] 安装 OpenClaw');
-  console.log('  3. 选 [2] 启动 Claude Code');
+  console.log('  Windows: 双击 start.bat → 输入密码 → Claude Code');
+  console.log('  macOS:   双击 macOS/start-claude.command → 输入密码 → Claude Code');
+  console.log('  安装:    Windows → install.bat | macOS → macOS/install-mac.command');
 }
 
 function copyDirRecursive(src, dest) {

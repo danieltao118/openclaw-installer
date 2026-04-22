@@ -1,13 +1,12 @@
-// launcher.js — 安全启动器：解密 API Key + 设置环境 + 启动 Claude Code
-// 所有敏感操作在 Node.js 进程内完成，不写入目标电脑磁盘
+// launcher-mac.js — macOS 安全启动器：解密 API Key + 设置环境 + 启动 Claude Code
+// 与 launcher.js (Windows) 平行，macOS 特化版本
 const fs = require('fs');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const path = require('path');
 const os = require('os');
 
-// 日志辅助函数
-// __dirname = tools/, USB_ROOT = 上一级
+// __dirname = macOS/, USB_ROOT = U盘根目录
 const USB_ROOT = path.resolve(__dirname, '..');
 function log(level, message, detail) {
   try {
@@ -25,7 +24,7 @@ function log(level, message, detail) {
 
 const tmpPassPath = process.argv[2];
 
-log('INFO', 'launcher.js 启动', `电脑: ${os.hostname()} USB: ${USB_ROOT}`);
+log('INFO', 'launcher-mac.js 启动', `电脑: ${os.hostname()} USB: ${USB_ROOT}`);
 
 if (!tmpPassPath || !fs.existsSync(tmpPassPath)) {
   console.error('[错误] 缺少密码');
@@ -33,11 +32,11 @@ if (!tmpPassPath || !fs.existsSync(tmpPassPath)) {
   process.exit(1);
 }
 
-// 从临时文件读取密码，读完后立即删除
+// 读取密码后立即删除临时文件
 const password = fs.readFileSync(tmpPassPath, 'utf8').trim();
 try { fs.unlinkSync(tmpPassPath); } catch {}
 
-// 1. 解密 API Key
+// 1. 解密 API Key（与 Windows launcher.js 完全一致）
 const encPath = path.join(USB_ROOT, '.guard', 'credentials.enc');
 if (!fs.existsSync(encPath)) {
   console.error('[错误] 凭证文件不存在');
@@ -60,8 +59,8 @@ try {
 
 log('INFO', 'API Key 解密成功');
 
-// 2. 构建隔离环境 —— 所有路径指向U盘，不写目标电脑
-const nodeExe = path.join(USB_ROOT, 'portable-node', 'node.exe');
+// 2. macOS 便携环境
+const nodeExe = path.join(__dirname, 'portable-node', 'bin', 'node');
 const claudeCli = path.join(USB_ROOT, 'claude-portable', 'node_modules', '@anthropic-ai', 'claude-code', 'cli.js');
 const claudeHome = path.join(USB_ROOT, 'claude-portable');
 
@@ -69,26 +68,21 @@ const claudeHome = path.join(USB_ROOT, 'claude-portable');
 const claudeDir = path.join(claudeHome, '.claude');
 if (!fs.existsSync(claudeDir)) fs.mkdirSync(claudeDir, { recursive: true });
 
-// 确保临时目录在U盘上
-const appdataDir = path.join(claudeHome, 'appdata');
-const localappdataDir = path.join(claudeHome, 'localappdata');
-if (!fs.existsSync(appdataDir)) fs.mkdirSync(appdataDir, { recursive: true });
-if (!fs.existsSync(localappdataDir)) fs.mkdirSync(localappdataDir, { recursive: true });
-
-// 查找 Git Bash（Claude Code Windows 必需）
-const gitBashPath = path.join(USB_ROOT, 'portable-git', 'bin', 'bash.exe');
-const gitCmdPath = path.join(USB_ROOT, 'portable-git', 'cmd');
-if (!fs.existsSync(gitBashPath)) {
-  console.error('[错误] portable-git/bin/bash.exe 不存在');
-  console.error('Claude Code 需要 Git Bash。请确保U盘中有 portable-git/ 目录。');
-  log('ERROR', 'portable-git 未找到', gitBashPath);
+if (!fs.existsSync(nodeExe)) {
+  console.error('[错误] portable-node 未解压。请先运行 start-claude.command');
+  log('ERROR', 'portable-node 未解压', nodeExe);
   process.exit(1);
 }
-log('INFO', 'Git Bash 找到', gitBashPath);
+
+if (!fs.existsSync(claudeCli)) {
+  console.error('[错误] Claude Code 未安装。请先在 Windows 上运行 prepare-usb.js');
+  log('ERROR', 'Claude Code 未安装', claudeCli);
+  process.exit(1);
+}
 
 const env = {
   ...process.env,
-  // API 配置（通过环境变量注入，不写文件）
+  // API 配置
   ANTHROPIC_AUTH_TOKEN: apikey,
   ANTHROPIC_BASE_URL: 'https://open.bigmodel.cn/api/anthropic',
   ANTHROPIC_MODEL: 'GLM-5.1',
@@ -97,19 +91,14 @@ const env = {
   ANTHROPIC_DEFAULT_OPUS_MODEL: 'GLM-5.1',
   ANTHROPIC_REASONING_MODEL: 'GLM-5.1',
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
-  // Git Bash 路径（Claude Code Windows 必需）
-  CLAUDE_CODE_GIT_BASH_PATH: gitBashPath,
-  // 关键：HOME 指向U盘，Claude Code 的所有配置和历史都写到U盘
+  // macOS: HOME 指向U盘，Claude Code 配置和历史写到U盘
   HOME: claudeHome,
-  USERPROFILE: claudeHome,
-  APPDATA: appdataDir,
-  LOCALAPPDATA: localappdataDir,
-  PATH: gitCmdPath + ';' + path.join(USB_ROOT, 'portable-node') + ';' + process.env.PATH,
+  PATH: path.join(__dirname, 'portable-node', 'bin') + ':' + (process.env.PATH || ''),
 };
 
 // 3. 启动 Claude Code
 const extraArgs = process.argv.slice(3);
-console.log('正在启动 Claude Code (便携模式)...');
+console.log('正在启动 Claude Code (macOS 便携模式)...');
 console.log('配置目录: ' + claudeDir);
 console.log('');
 

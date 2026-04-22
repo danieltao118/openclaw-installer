@@ -2,6 +2,7 @@
 const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const logger = require('./logger');
 
 const NPM_MIRROR = 'https://registry.npmmirror.com';
@@ -43,10 +44,11 @@ async function installOpenclaw(win) {
   ensureNpmGlobalDir();
 
   // 先卸载旧版，避免 npm install 时 EBUSY rename 错误
+  ensureNpmInPath();
   try {
-    const npmPath = getNpmPath();
-    logger.info(`卸载旧版: ${npmPath} uninstall -g openclaw`);
-    execSync(`"${npmPath}" uninstall -g openclaw`, {
+    const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    logger.info(`卸载旧版: ${npmCmd} uninstall -g openclaw`);
+    execSync(`${npmCmd} uninstall -g openclaw`, {
       timeout: 30000,
       windowsHide: true,
       stdio: 'pipe',
@@ -110,15 +112,55 @@ function getNpmPath() {
   return 'npm.cmd';
 }
 
+// 确保 npm 在 PATH 中（通过命令名调用，避免路径空格问题）
+function ensureNpmInPath() {
+  if (process.platform !== 'win32') return;
+  // 先检查 npm.cmd 是否已可用
+  try {
+    execSync('npm.cmd --version', { timeout: 5000, stdio: 'pipe' });
+    return;
+  } catch {}
+  // 不可用，将 nodejs 目录添加到 PATH
+  const candidates = [
+    path.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs'),
+    path.join(process.env.LOCALAPPDATA || '', 'Programs', 'nodejs'),
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(path.join(p, 'npm.cmd'))) {
+      if (!process.env.PATH.toLowerCase().includes(p.toLowerCase())) {
+        process.env.PATH = p + ';' + process.env.PATH;
+        logger.info(`添加 npm 目录到 PATH: ${p}`);
+      }
+      return;
+    }
+  }
+}
+
 function runNpmInstall(win, bundledTgz) {
   return new Promise((resolve, reject) => {
-    const npmPath = getNpmPath();
-    logger.info(`npm 路径: ${npmPath}`);
+    // 确保 npm 在 PATH 中，然后用命令名调用（避免路径空格问题）
+    ensureNpmInPath();
+    const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    logger.info(`npm 命令: ${npmCmd}`);
+
+    // 将内置包复制到无空格的临时路径（避免路径空格问题）
+    let installTarget = null;
+    if (bundledTgz && fs.existsSync(bundledTgz)) {
+      if (bundledTgz.includes(' ')) {
+        const tempDir = path.join(os.tmpdir(), 'openclaw-install');
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+        installTarget = path.join(tempDir, 'openclaw-bundled.tgz');
+        fs.copyFileSync(bundledTgz, installTarget);
+        logger.info(`复制内置包到临时目录: ${installTarget}`);
+      } else {
+        installTarget = bundledTgz;
+      }
+    }
 
     let args;
-    if (bundledTgz && fs.existsSync(bundledTgz)) {
+    if (installTarget) {
       logger.info(`使用内置 tarball 安装`);
-      args = ['install', '-g', bundledTgz, '--no-audit', '--no-fund'];
+      args = ['install', '-g', installTarget, '--no-audit', '--no-fund'];
     } else {
       logger.info(`使用在线安装 openclaw@${OPENCLAW_VERSION}`);
       args = ['install', '-g', `openclaw@${OPENCLAW_VERSION}`,
@@ -127,10 +169,11 @@ function runNpmInstall(win, bundledTgz) {
       ];
     }
 
-    const child = spawn('cmd', ['/c', npmPath, ...args], {
+    const child = spawn(npmCmd, args, {
       stdio: 'pipe',
       env: { ...process.env },
       windowsHide: true,
+      shell: true,
     });
 
     let stderr = '';

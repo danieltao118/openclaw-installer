@@ -6,6 +6,7 @@ const https = require('https');
 const versions = require('./load-versions');
 const NODE_VERSION = versions.node;
 const OPENCLAW_VERSION = versions.openclaw;
+const GIT_VERSION = versions.git;
 
 const BUNDLED_DIR = path.join(__dirname, '..', 'bundled');
 
@@ -25,6 +26,17 @@ const NODE_FILES = [
     url: `https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-darwin-x64.tar.gz`,
     file: `node-v${NODE_VERSION}-darwin-x64.tar.gz`,
     platform: 'darwin-x64',
+  },
+];
+
+// Git for Windows 安装包（仅 Windows）
+// 优先使用华为云镜像，GitHub 在国内下载慢
+const GIT_MIRROR = process.env.GIT_MIRROR || 'https://mirrors.huaweicloud.com/git-for-windows';
+const GIT_FILES = [
+  {
+    url: `${GIT_MIRROR}/v${GIT_VERSION}.windows.1/Git-${GIT_VERSION}-64-bit.exe`,
+    file: `Git-${GIT_VERSION}-64-bit.exe`,
+    platform: 'win32',
   },
 ];
 
@@ -112,8 +124,13 @@ async function main() {
         return false;
       });
 
+  const gitFilesToDownload = downloadAll
+    ? GIT_FILES
+    : GIT_FILES.filter((f) => platform === 'win32' && f.platform === 'win32');
+
   const allDownloads = [
     ...nodeFilesToDownload.map((f) => ({ ...f, label: `Node.js ${f.platform}` })),
+    ...gitFilesToDownload.map((f) => ({ ...f, label: `Git ${f.platform}` })),
     { ...OPENCLAW_FILE, label: `OpenClaw@${OPENCLAW_VERSION}` },
   ];
 

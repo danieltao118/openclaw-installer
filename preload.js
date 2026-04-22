@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('installerAPI', {
   detectEnvironment: () => ipcRenderer.invoke('detect-environment'),
   installNode: () => ipcRenderer.invoke('install-node'),
+  installGit: () => ipcRenderer.invoke('install-git'),
   installOpenclaw: () => ipcRenderer.invoke('install-openclaw'),
   verifyInstallation: () => ipcRenderer.invoke('verify-installation'),
   onProgress: (callback) => {

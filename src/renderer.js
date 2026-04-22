@@ -32,6 +32,7 @@ const INSTALL_STEPS = [
   'istep-detect',
   'istep-download-node',
   'istep-install-node',
+  'istep-install-git',
   'istep-mirror',
   'istep-install-openclaw',
   'istep-verify',
@@ -80,6 +81,8 @@ function renderDetectResults(env) {
         : '未安装',
       ok: env.openclawStatus === 'installed' && !env.openclawNeedsUpdate },
     { label: '网络连接', value: env.networkOk ? '正常' : '无法连接', ok: env.networkOk },
+    { label: 'Git', value: env.gitStatus === 'ok' ? `已安装 ${env.gitVersion || ''}` : '未安装',
+      ok: env.gitStatus === 'ok' },
   ];
 
   // 杀毒软件检测项（仅 Windows 有）
@@ -265,6 +268,23 @@ async function runInstall() {
       setStepDone('istep-install-node');
       appendLog('Node.js 已就绪，跳过安装');
       updateTopProgress(60, 'Node.js 已就绪');
+    }
+
+    // 步骤3.5: 安装 Git（如果需要）
+    if (envResult.gitStatus !== 'ok') {
+      updateTopProgress(62, '正在安装 Git...');
+      setStepActive('istep-install-git');
+      appendLog('正在安装 Git...');
+
+      await window.installerAPI.installGit();
+
+      setStepDone('istep-install-git');
+      appendLog('Git 安装完成');
+      updateTopProgress(65, 'Git 已安装');
+    } else {
+      setStepDone('istep-install-git');
+      appendLog('Git 已就绪，跳过安装');
+      updateTopProgress(65, 'Git 已就绪');
     }
 
     // 步骤4: 配置镜像（自动）

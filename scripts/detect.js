@@ -113,7 +113,18 @@ async function detect(win, versions) {
     logger.info('OpenClaw: 未安装');
   }
 
-  // 5. 网络连通性
+  // 6. 检测 Git
+  try {
+    const gitVer = execSync('git --version', { timeout: 5000, encoding: 'utf8' }).trim();
+    result.gitStatus = 'ok';
+    result.gitVersion = gitVer;
+    logger.info(`Git: ${gitVer}`);
+  } catch {
+    result.gitStatus = 'missing';
+    logger.info('Git: 未安装');
+  }
+
+  // 7. 网络连通性
   result.networkOk = await checkNetwork('https://registry.npmmirror.com');
   logger.info(`网络: ${result.networkOk ? '正常' : '不可用'}`);
 
