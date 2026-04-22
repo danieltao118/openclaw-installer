@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>反馈管理 - OpenClaw</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #0d0d1a; color: #e0e0e8; min-height: 100vh; }
+.header { background: rgba(255,255,255,0.03); border-bottom: 1px solid rgba(255,255,255,0.06); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+.header h1 { font-size: 1.1rem; color: #fff; }
+.header a { color: #e94560; font-size: 0.85rem; }
+.stats { padding: 16px 24px; display: flex; gap: 24px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+.stat { font-size: 0.85rem; color: #888; }
+.stat b { color: #f5c518; font-size: 1.1rem; }
+.list { padding: 16px 24px; }
+.item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 20px; margin-bottom: 12px; }
+.item.new { border-left: 3px solid #e94560; }
+.item.viewed { border-left: 3px solid #f5c518; }
+.item.resolved { border-left: 3px solid #4ade80; opacity: 0.6; }
+.item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.item-id { font-family: monospace; color: #888; font-size: 0.8rem; }
+.item-time { font-size: 0.8rem; color: #666; }
+.item-status { font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; }
+.item-status.new { background: rgba(233,69,96,0.15); color: #e94560; }
+.item-status.viewed { background: rgba(245,197,24,0.15); color: #f5c518; }
+.item-status.resolved { background: rgba(74,222,128,0.15); color: #4ade80; }
+.item-error { font-size: 0.9rem; color: #ef4444; margin-bottom: 8px; font-weight: 600; }
+.item-sysinfo { font-size: 0.8rem; color: #888; margin-bottom: 12px; }
+.item-sysinfo span { margin-right: 16px; }
+.item-log { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.75rem; color: #a0a0b8; max-height: 200px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+.item-actions { margin-top: 12px; display: flex; gap: 8px; }
+.btn { padding: 6px 16px; border-radius: 6px; border: none; font-size: 0.8rem; cursor: pointer; font-family: inherit; }
+.btn-view { background: rgba(245,197,24,0.15); color: #f5c518; }
+.btn-resolve { background: rgba(74,222,128,0.15); color: #4ade80; }
+.btn-detail { background: rgba(255,255,255,0.06); color: #e0e0e8; }
+.empty { text-align: center; padding: 60px; color: #555; font-size: 0.95rem; }
+.refresh { padding: 6px 16px; background: rgba(233,69,96,0.15); color: #e94560; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-family: inherit; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>OpenClaw 安装器反馈管理</h1>
+  <div>
+    <button class="refresh" onclick="loadFeedback()">刷新</button>
+    <a href="/api/codes.csv" style="background:rgba(74,222,128,0.15);color:#4ade80;padding:6px 16px;border-radius:6px;font-size:0.85rem;">下载领取记录CSV</a>
+    <a href="/">← 返回领取页</a>
+  </div>
+</div>
+<div class="stats" id="stats"></div>
+<div class="list" id="list"></div>
+
+<script>
+async function loadFeedback() {
+  try {
+    const resp = await fetch('/api/feedback');
+    const data = await resp.json();
+    renderStats(data);
+    renderList(data);
+  } catch (e) {
+    document.getElementById('list').innerHTML = '<div class="empty">加载失败</div>';
+  }
+}
+
+function renderStats(data) {
+  const newCount = data.filter(f => f.status === 'new').length;
+  const viewedCount = data.filter(f => f.status === 'viewed').length;
+  const resolvedCount = data.filter(f => f.status === 'resolved').length;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat">待处理 <b>${newCount}</b></div>
+    <div class="stat">已查看 <b>${viewedCount}</b></div>
+    <div class="stat">已解决 <b>${resolvedCount}</b></div>
+    <div class="stat">总计 <b>${data.length}</b></div>
+  `;
+}
+
+function renderList(data) {
+  if (!data.length) {
+    document.getElementById('list').innerHTML = '<div class="empty">暂无反馈</div>';
+    return;
+  }
+  document.getElementById('list').innerHTML = data.map(f => {
+    const si = f.systemInfo || {};
+    const statusLabel = { new: '待处理', viewed: '已查看', resolved: '已解决' }[f.status] || f.status;
+    return `
+      <div class="item ${f.status}">
+        <div class="item-header">
+          <span class="item-id">#${f.id}</span>
+          <span class="item-time">${new Date(f.createdAt).toLocaleString('zh-CN')}</span>
+          <span class="item-status ${f.status}">${statusLabel}</span>
+        </div>
+        ${f.error ? `<div class="item-error">${escHtml(f.error)}</div>` : ''}
+        ${f.contact ? `<div style="font-size:0.8rem;color:#f5c518;margin-bottom:8px;">联系: ${escHtml(f.contact)}</div>` : ''}
+        <div class="item-sysinfo">
+          <span>${si.os || '?'}</span>
+          <span>${si.arch || '?'}</span>
+          <span>${si.memory || '?'}</span>
+          <span>安装器 v${si.installerVersion || '?'}</span>
+          <span>Node ${si.nodeVersion || '?'}</span>
+        </div>
+        ${f.logTail ? `<details><summary style="cursor:pointer;color:#888;font-size:0.8rem;margin-bottom:8px;">查看日志</summary><div class="item-log">${escHtml(f.logTail)}</div></details>` : ''}
+        <div class="item-actions">
+          ${f.status === 'new' ? '<button class="btn btn-view" onclick="updateStatus(\'' + f.id + '\',\'viewed\')">标记已查看</button>' : ''}
+          ${f.status !== 'resolved' ? '<button class="btn btn-resolve" onclick="updateStatus(\'' + f.id + '\',\'resolved\')">标记已解决</button>' : ''}
+          ${f.status === 'resolved' ? '<button class="btn btn-view" onclick="updateStatus(\'' + f.id + '\',\'new\')">重新打开</button>' : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// 本地更新状态（简化版，存到 localStorage 标记）
+async function updateStatus(id, status) {
+  // 先获取当前数据，修改后存回（需要服务端支持，这里先用本地标记）
+  const resp = await fetch('/api/feedback');
+  const data = await resp.json();
+  const item = data.find(f => f.id === id);
+  if (item) {
+    item.status = status;
+    // 写回服务端（复用 feedback.json 写入）
+    // 暂时用本地方式：重新POST不太合适，直接标记
+    const { writeFeedbacks } = window;
+    // 简化：直接刷新页面，用 fetch PUT
+  }
+  // 临时方案：本地标记
+  let marks = JSON.parse(localStorage.getItem('feedback-marks') || '{}');
+  marks[id] = status;
+  localStorage.setItem('feedback-marks', JSON.stringify(marks));
+  loadFeedback();
+}
+
+loadFeedback();
+
+// 覆盖渲染，应用本地标记
+const origRender = renderList;
+renderList = function(data) {
+  const marks = JSON.parse(localStorage.getItem('feedback-marks') || '{}');
+  data = data.map(f => ({ ...f, status: marks[f.id] || f.status }));
+  origRender(data);
+  renderStats(data);
+};
+</script>
+</body>
+</html>

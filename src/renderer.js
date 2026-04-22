@@ -147,11 +147,62 @@ function getOsName(os, arch) {
 }
 
 // ========== 错误处理 ==========
+let lastErrorMessage = '';
+
 function showError(message, details) {
+  lastErrorMessage = message;
   showStep('error');
   $('#error-message').textContent = message;
   if (details) {
     $('#error-detail').textContent = details;
+  }
+  // 重置反馈按钮状态
+  const feedbackBtn = $('#feedback-btn');
+  if (feedbackBtn) {
+    feedbackBtn.disabled = false;
+    feedbackBtn.textContent = '一键反馈给技术支持';
+  }
+  const feedbackResult = $('#feedback-result');
+  if (feedbackResult) feedbackResult.textContent = '';
+}
+
+// ========== 一键反馈 ==========
+async function submitFeedback() {
+  const btn = $('#feedback-btn');
+  const result = $('#feedback-result');
+  btn.disabled = true;
+  btn.textContent = '提交中...';
+  result.textContent = '';
+
+  try {
+    const [systemInfo, logTail] = await Promise.all([
+      window.installerAPI.getSystemInfo(),
+      window.installerAPI.getLogTail(),
+    ]);
+
+    const resp = await fetch('https://activate.jiaopeiclaw.com/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        error: lastErrorMessage,
+        systemInfo,
+        logTail,
+      }),
+    });
+
+    const data = await resp.json();
+    if (data.ok) {
+      btn.textContent = '已提交';
+      result.textContent = '反馈已提交，我们会尽快处理！';
+      result.style.color = '#4ade80';
+    } else {
+      throw new Error(data.msg || '提交失败');
+    }
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = '重试提交';
+    result.textContent = '提交失败（' + err.message + '），请截图发给管理员';
+    result.style.color = '#ef4444';
   }
 }
 

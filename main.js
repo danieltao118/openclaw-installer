@@ -51,21 +51,62 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
 }
 
-app.whenReady().then(createWindow).catch(err => {
-  console.error('窗口创建失败:', err);
+app.whenReady().then(() => {
+  portableLog('INFO', 'Electron: 应用启动', `便携模式: ${isPortableMode}`);
+  createWindow();
+}).catch(err => {
+  portableLog('ERROR', 'Electron: 窗口创建失败', err.message);
   app.quit();
 });
-app.on('window-all-closed', () => app.quit());
+app.on('window-all-closed', () => {
+  portableLog('INFO', 'Electron: 应用退出');
+  app.quit();
+});
 
 // 跨平台命令名辅助
 function getCmd(name) {
   return process.platform === 'win32' ? name + '.cmd' : name;
 }
 
+// 便携模式日志 — 错误写入U盘
+function portableLog(level, message, detail) {
+  if (!isPortableMode) return;
+  try {
+    // 找到U盘根目录（.portable 所在目录）
+    let usbRoot = '';
+    if (process.env.PORTABLE_EXECUTABLE_DIR) {
+      usbRoot = process.env.PORTABLE_EXECUTABLE_DIR;
+    } else {
+      const appDir = process.platform === 'darwin'
+        ? path.dirname(path.dirname(path.dirname(app.getAppPath())))
+        : path.dirname(app.getPath('exe'));
+      for (let dir = appDir; dir !== path.dirname(dir); dir = path.dirname(dir)) {
+        if (fs.existsSync(path.join(dir, '.portable'))) { usbRoot = dir; break; }
+      }
+    }
+    if (!usbRoot) return;
+    const logDir = path.join(usbRoot, 'logs');
+    if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+    const now = new Date();
+    const timestamp = now.toISOString().replace('T', ' ').substring(0, 19);
+    const dateStr = now.toISOString().substring(0, 10);
+    const line = detail
+      ? `[${timestamp}] [${level}] ${message} | ${detail}\n`
+      : `[${timestamp}] [${level}] ${message}\n`;
+    fs.appendFileSync(path.join(logDir, `${dateStr}.log`), line, 'utf8');
+  } catch {}
+}
+
 // IPC Handlers
 ipcMain.handle('detect-environment', async (event) => {
-  const detect = require('./scripts/detect');
-  return detect(mainWindow, loadVersions());
+  try {
+    const detect = require('./scripts/detect');
+    portableLog('INFO', 'Electron: 环境检测');
+    return detect(mainWindow, loadVersions());
+  } catch (err) {
+    portableLog('ERROR', 'Electron: 环境检测失败', err.message);
+    throw err;
+  }
 });
 
 ipcMain.handle('get-versions', async () => {
@@ -73,13 +114,29 @@ ipcMain.handle('get-versions', async () => {
 });
 
 ipcMain.handle('install-node', async (event) => {
-  const installNode = require('./scripts/install-node');
-  return installNode(mainWindow);
+  try {
+    portableLog('INFO', 'Electron: 开始安装 Node.js');
+    const installNode = require('./scripts/install-node');
+    const result = await installNode(mainWindow);
+    portableLog('INFO', 'Electron: Node.js 安装完成');
+    return result;
+  } catch (err) {
+    portableLog('ERROR', 'Electron: Node.js 安装失败', err.message);
+    throw err;
+  }
 });
 
 ipcMain.handle('install-openclaw', async (event) => {
-  const installOpenclaw = require('./scripts/install-openclaw');
-  return installOpenclaw(mainWindow);
+  try {
+    portableLog('INFO', 'Electron: 开始安装 OpenClaw');
+    const installOpenclaw = require('./scripts/install-openclaw');
+    const result = await installOpenclaw(mainWindow);
+    portableLog('INFO', 'Electron: OpenClaw 安装完成');
+    return result;
+  } catch (err) {
+    portableLog('ERROR', 'Electron: OpenClaw 安装失败', err.message);
+    throw err;
+  }
 });
 
 ipcMain.handle('verify-installation', async (event) => {
@@ -117,6 +174,30 @@ ipcMain.handle('open-log-file', async (event) => {
     fs.writeFileSync(logger.LOG_FILE, `[${new Date().toISOString()}] [INFO] 日志文件已创建\n`, 'utf8');
   }
   await shell.openPath(logger.LOG_FILE);
+});
+
+// 反馈相关 IPC
+const os = require('os');
+ipcMain.handle('get-system-info', async () => {
+  return {
+    os: os.platform() + ' ' + os.release(),
+    arch: os.arch(),
+    cpu: os.cpus()[0]?.model || 'unknown',
+    memory: Math.round(os.totalmem() / 1024 / 1024 / 1024) + 'GB',
+    nodeVersion: process.versions.node,
+    electronVersion: process.versions.electron,
+    installerVersion: loadVersions().installer || '1.0.0',
+  };
+});
+
+ipcMain.handle('get-log-tail', async () => {
+  const logger = require('./scripts/logger');
+  try {
+    if (!fs.existsSync(logger.LOG_FILE)) return '';
+    const content = fs.readFileSync(logger.LOG_FILE, 'utf8');
+    const lines = content.trim().split('\n');
+    return lines.slice(-200).join('\n');
+  } catch { return ''; }
 });
 
 // 激活码相关 IPC

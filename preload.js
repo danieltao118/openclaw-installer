@@ -32,4 +32,7 @@ contextBridge.exposeInMainWorld('installerAPI', {
     return () => ipcRenderer.removeListener('feishu-login-output', listener);
   },
   openLogFile: () => ipcRenderer.invoke('open-log-file'),
+  // 反馈相关
+  getSystemInfo: () => ipcRenderer.invoke('get-system-info'),
+  getLogTail: () => ipcRenderer.invoke('get-log-tail'),
 });
