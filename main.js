@@ -4,18 +4,25 @@ const fs = require('fs');
 
 // 加载版本配置
 function loadVersions() {
-  try {
-    // 生产环境：从打包资源读取
-    const prodPath = path.join(process.resourcesPath, 'versions.json');
-    if (fs.existsSync(prodPath)) {
-      return JSON.parse(fs.readFileSync(prodPath, 'utf8'));
-    }
-  } catch {}
-  try {
-    // 开发环境：从项目根目录读取
-    return JSON.parse(fs.readFileSync(path.join(__dirname, 'versions.json'), 'utf8'));
-  } catch {}
-  return { node: 'unknown', openclaw: 'unknown', installer: '1.0.0' };
+  const paths = [
+    // 生产环境：extraResources 复制到 resources/ 目录
+    process.resourcesPath ? path.join(process.resourcesPath, 'versions.json') : null,
+    // NSIS 安装目录下
+    process.resourcesPath ? path.join(process.resourcesPath, '..', 'versions.json') : null,
+    // 开发环境
+    path.join(__dirname, 'versions.json'),
+    path.join(__dirname, '..', 'versions.json'),
+  ];
+  for (const p of paths) {
+    if (!p) continue;
+    try {
+      if (fs.existsSync(p)) {
+        return JSON.parse(fs.readFileSync(p, 'utf8'));
+      }
+    } catch {}
+  }
+  // 兜底
+  return { node: '22.22.2', openclaw: '2026.4.15', installer: '1.0.0' };
 }
 
 let mainWindow;

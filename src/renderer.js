@@ -175,10 +175,17 @@ async function submitFeedback() {
   result.textContent = '';
 
   try {
-    const [systemInfo, logTail] = await Promise.all([
-      window.installerAPI.getSystemInfo(),
-      window.installerAPI.getLogTail(),
-    ]);
+    // 系统信息获取失败不阻塞反馈提交
+    let systemInfo = {};
+    let logTail = '';
+    try {
+      [systemInfo, logTail] = await Promise.all([
+        window.installerAPI.getSystemInfo(),
+        window.installerAPI.getLogTail(),
+      ]);
+    } catch {
+      // getSystemInfo 可能因 loadVersions 失败，继续提交
+    }
 
     const resp = await fetch('https://activate.jiaopeiclaw.com/feedback', {
       method: 'POST',
