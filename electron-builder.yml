@@ -32,12 +32,16 @@ nsis:
 
 mac:
   target:
+    - target: dmg
+      arch: [x64, arm64]
     - target: zip
       arch: [x64, arm64]
   icon: build/icon.png
   category: public.app-category.developer-tools
   hardenedRuntime: false
   identity: null
+dmg:
+  artifactName: OpenClaw-Installer-${arch}.dmg
 
 asar: true
 asarUnpack:

@@ -38,6 +38,13 @@ const GIT_FILES = [
     file: `Git-${GIT_VERSION}-64-bit.exe`,
     platform: 'win32',
   },
+  // macOS Git（Intel+Apple Silicon 通用二进制）
+  // 下载后重命名为 git-mac.pkg，install-git.js 按此文件名查找
+  {
+    url: `https://sourceforge.net/projects/git-osx-installer/files/git-${GIT_VERSION}-intel-universal-mavericks.pkg/download`,
+    file: 'git-mac.pkg',
+    platform: 'darwin',
+  },
 ];
 
 // OpenClaw npm tarball（通用，跨平台）
@@ -126,7 +133,11 @@ async function main() {
 
   const gitFilesToDownload = downloadAll
     ? GIT_FILES
-    : GIT_FILES.filter((f) => platform === 'win32' && f.platform === 'win32');
+    : GIT_FILES.filter((f) => {
+        if (platform === 'win32' && f.platform === 'win32') return true;
+        if (platform === 'darwin' && f.platform === 'darwin') return true;
+        return false;
+      });
 
   const allDownloads = [
     ...nodeFilesToDownload.map((f) => ({ ...f, label: `Node.js ${f.platform}` })),

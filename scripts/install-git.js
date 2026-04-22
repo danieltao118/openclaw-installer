@@ -1,4 +1,4 @@
-// scripts/install-git.js — 下载并静默安装 Git for Windows
+// scripts/install-git.js — 安装 Git（Windows: 静默安装 .exe / macOS: xcode-select --install）
 const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
@@ -20,6 +20,12 @@ function getDownloadInfo() {
 }
 
 async function installGit(win) {
+  // macOS: 用 xcode-select --install 安装 Command Line Tools（包含 git）
+  if (process.platform === 'darwin') {
+    return installMacGit(win);
+  }
+
+  // Windows: 下载并静默安装 Git for Windows
   const { url, filename } = getDownloadInfo();
   const destPath = path.join(os.tmpdir(), filename);
 
@@ -185,6 +191,99 @@ function refreshPath() {
   if (fs.existsSync(gitDir) && !process.env.PATH.toLowerCase().includes(gitDir.toLowerCase())) {
     process.env.PATH = gitDir + ';' + process.env.PATH;
   }
+}
+
+// macOS: 用内置 .pkg 安装 Git（和 Windows 一样离线安装）
+function installMacGit(win) {
+  return new Promise((resolve, reject) => {
+    logger.info('macOS: 开始安装 Git...');
+
+    // 查找内置 .pkg
+    const candidates = [
+      process.resourcesPath ? path.join(process.resourcesPath, 'bundled', 'git-mac.pkg') : null,
+      path.join(__dirname, '..', 'bundled', 'git-mac.pkg'),
+    ];
+
+    let pkgPath = null;
+    for (const p of candidates) {
+      if (p && fs.existsSync(p) && fs.statSync(p).size > 1024) {
+        pkgPath = p;
+        break;
+      }
+    }
+
+    if (!pkgPath) {
+      // 没有内置包，尝试 xcode-select --install 作为兜底
+      logger.info('macOS: 未找到内置 Git .pkg，尝试 xcode-select --install');
+      return installMacGitFallback(win).then(resolve, reject);
+    }
+
+    logger.info(`macOS: 使用内置 Git: ${pkgPath}`);
+    if (win && !win.isDestroyed()) {
+      win.webContents.send('install-progress', {
+        message: '正在安装 Git...',
+      });
+    }
+
+    try {
+      const sudo = require('sudo-prompt');
+      const options = { name: 'OpenClaw 安装向导' };
+      sudo.exec(`installer -pkg "${pkgPath}" -target /`, options, (error, stdout, stderr) => {
+        if (error) {
+          logger.error(`macOS Git 安装失败: ${error.message}`);
+          // 降级到 xcode-select
+          logger.info('尝试 xcode-select --install 作为降级方案');
+          installMacGitFallback(win).then(resolve, reject);
+        } else {
+          logger.info('macOS Git 安装成功');
+          resolve({ success: true });
+        }
+      });
+    } catch (err) {
+      logger.error(`sudo-prompt 加载失败: ${err.message}`);
+      installMacGitFallback(win).then(resolve, reject);
+    }
+  });
+}
+
+// 兜底：通过 xcode-select --install 安装 Command Line Tools（包含 git）
+function installMacGitFallback(win) {
+  return new Promise((resolve, reject) => {
+    logger.info('macOS: 通过 xcode-select 安装 Git...');
+    try {
+      execSync('xcode-select --install 2>&1', { timeout: 30000, stdio: 'pipe' });
+    } catch (err) {
+      const msg = err.message || '';
+      if (msg.includes('already installed') || msg.includes('command line tools are already installed')) {
+        logger.info('macOS: Command Line Tools 已安装');
+        resolve({ success: true });
+        return;
+      }
+    }
+    // 等待用户在系统对话框中完成安装
+    waitForMacGit(resolve, reject);
+  });
+}
+
+// 等待 macOS git 安装完成
+function waitForMacGit(resolve, reject) {
+  let attempts = 0;
+  const maxAttempts = 60; // 5 分钟（每 5 秒检查一次）
+  const check = () => {
+    attempts++;
+    try {
+      const ver = execSync('git --version', { timeout: 5000, encoding: 'utf8' }).trim();
+      logger.info(`macOS Git 安装完成: ${ver}`);
+      resolve({ success: true });
+    } catch {
+      if (attempts < maxAttempts) {
+        setTimeout(check, 5000);
+      } else {
+        reject(new Error('Git 安装超时。请手动在终端执行: xcode-select --install'));
+      }
+    }
+  };
+  setTimeout(check, 5000);
 }
 
 module.exports = installGit;

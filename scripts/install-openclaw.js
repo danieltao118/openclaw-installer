@@ -1,18 +1,15 @@
-// scripts/install-openclaw.js — 通过 npm 安装 OpenClaw（优先使用内置包）
+// scripts/install-openclaw.js — 安装 OpenClaw（和官方一样：npm install -g openclaw）
 const { spawn, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const logger = require('./logger');
 
-const NPM_MIRROR = 'https://registry.npmmirror.com';
-const MAX_RETRIES = 3;
-const INSTALL_TIMEOUT = 5 * 60 * 1000; // 5分钟超时
-
 const versions = require('./load-versions');
 const OPENCLAW_VERSION = versions.openclaw;
+const NPM_MIRROR = 'https://registry.npmmirror.com';
 
-// 查找内置 tarball（多个 fallback 路径）
+// 查找内置 tarball
 function findBundledTgz() {
   const candidates = [
     process.resourcesPath ? path.join(process.resourcesPath, 'bundled') : null,
@@ -26,7 +23,7 @@ function findBundledTgz() {
       const files = fs.readdirSync(dir).filter(f => f.startsWith('openclaw-') && f.endsWith('.tgz'));
       if (files.length > 0) {
         const tgz = path.join(dir, files[0]);
-        logger.info(`找到内置 OpenClaw: ${tgz}`);
+        logger.info(`找到内置包: ${tgz}`);
         return tgz;
       }
     } catch {}
@@ -34,272 +31,97 @@ function findBundledTgz() {
   return null;
 }
 
-async function installOpenclaw(win) {
-  logger.info('开始安装 OpenClaw...');
-
-  // 安装前先关闭正在运行的 OpenClaw 进程，避免 EBUSY 文件锁
-  killOpenclawProcesses();
-
-  // 确保 npm 全局目录存在（新电脑可能没有 APPDATA\npm）
-  ensureNpmGlobalDir();
-
-  // 先卸载旧版，避免 npm install 时 EBUSY rename 错误
-  ensureNpmInPath();
-  try {
-    const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    logger.info(`卸载旧版: ${npmCmd} uninstall -g openclaw`);
-    execSync(`${npmCmd} uninstall -g openclaw`, {
-      timeout: 30000,
-      windowsHide: true,
-      stdio: 'pipe',
-    });
-    logger.info('旧版卸载完成');
-  } catch (err) {
-    logger.info(`旧版卸载跳过（可能未安装）: ${err.message}`);
-  }
-
-  const bundledTgz = findBundledTgz();
-  if (bundledTgz) {
-    logger.info(`将使用内置包: ${bundledTgz}`);
-  } else {
-    logger.info(`未找到内置包，将在线安装 v${OPENCLAW_VERSION}`);
-  }
-
-  let lastError = null;
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      logger.info(`安装尝试 ${attempt}/${MAX_RETRIES}`);
-      if (win && !win.isDestroyed() && attempt > 1) {
-        win.webContents.send('install-progress', {
-          message: `安装失败，正在重试 (${attempt}/${MAX_RETRIES})...`,
-        });
-      }
-      await runNpmInstall(win, bundledTgz);
-      logger.info('OpenClaw 安装成功');
-
-      // 安装后验证
-      const verified = verifyOpenclaw();
-      if (!verified) {
-        logger.warn('安装后验证失败：openclaw --version 未返回结果');
-      }
-
-      return { success: true, verified };
-    } catch (err) {
-      lastError = err;
-      logger.warn(`安装第 ${attempt} 次失败: ${err.message}`);
-      if (attempt < MAX_RETRIES) {
-        await sleep(2000 * attempt);
-      }
-    }
-  }
-
-  throw new Error(`OpenClaw 安装失败（已重试 ${MAX_RETRIES} 次）。\n${lastError.message}\n\n请尝试手动执行:\nnpm install -g openclaw@${OPENCLAW_VERSION} --registry=${NPM_MIRROR}`);
-}
-
-function getNpmPath() {
-  if (process.platform !== 'win32') return 'npm';
-  try {
-    const npmPath = execSync('where npm.cmd', { encoding: 'utf8', timeout: 5000 }).split('\n')[0].trim();
-    if (npmPath) return npmPath;
-  } catch {}
-  const candidates = [
-    path.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs', 'npm.cmd'),
-    path.join(process.env.LOCALAPPDATA || '', 'Programs', 'nodejs', 'npm.cmd'),
-  ];
-  for (const c of candidates) {
-    try { fs.accessSync(c); return c; } catch {}
-  }
-  return 'npm.cmd';
-}
-
-// 确保 npm 在 PATH 中（通过命令名调用，避免路径空格问题）
+// 确保 npm 在 PATH 中（Node.js 刚装完，PATH 可能没刷新）
 function ensureNpmInPath() {
-  if (process.platform !== 'win32') return;
-  // 先检查 npm.cmd 是否已可用
+  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const sep = process.platform === 'win32' ? ';' : ':';
+
+  // 先检查 npm 是否已经可用
   try {
-    execSync('npm.cmd --version', { timeout: 5000, stdio: 'pipe' });
+    execSync(`${npmCmd} --version`, { timeout: 5000, stdio: 'pipe' });
     return;
   } catch {}
-  // 不可用，将 nodejs 目录添加到 PATH
-  const candidates = [
+
+  // macOS: 从 login shell 刷新 PATH
+  if (process.platform === 'darwin') {
+    try {
+      const shellPath = execSync('/usr/bin/env bash -lc "echo $PATH"', { encoding: 'utf8', timeout: 5000 }).trim();
+      if (shellPath && shellPath.includes('/')) {
+        process.env.PATH = shellPath;
+        logger.info('macOS PATH 已从 login shell 刷新');
+        return;
+      }
+    } catch {}
+    // 兜底：添加常见路径
+    for (const p of ['/usr/local/bin', '/opt/homebrew/bin']) {
+      if (fs.existsSync(p) && !process.env.PATH.includes(p)) {
+        process.env.PATH = p + sep + process.env.PATH;
+      }
+    }
+    return;
+  }
+
+  // Windows: 从注册表刷新 PATH
+  try {
+    const sysPath = execSync(
+      'powershell -Command "[Environment]::GetEnvironmentVariable(\'Path\',\'Machine\')"',
+      { encoding: 'utf8', timeout: 10000, stdio: 'pipe' }
+    ).trim();
+    const userPath = execSync(
+      'powershell -Command "[Environment]::GetEnvironmentVariable(\'Path\',\'User\')"',
+      { encoding: 'utf8', timeout: 10000, stdio: 'pipe' }
+    ).trim();
+    process.env.PATH = sysPath + ';' + userPath;
+    logger.info('Windows PATH 已从注册表刷新');
+    return;
+  } catch {}
+
+  // 兜底：手动添加已知路径
+  const dirs = [
     path.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs'),
     path.join(process.env.LOCALAPPDATA || '', 'Programs', 'nodejs'),
   ];
-  for (const p of candidates) {
-    if (fs.existsSync(path.join(p, 'npm.cmd'))) {
-      if (!process.env.PATH.toLowerCase().includes(p.toLowerCase())) {
-        process.env.PATH = p + ';' + process.env.PATH;
-        logger.info(`添加 npm 目录到 PATH: ${p}`);
-      }
+  for (const d of dirs) {
+    if (fs.existsSync(path.join(d, 'npm.cmd'))) {
+      process.env.PATH = d + ';' + process.env.PATH;
+      logger.info(`手动添加到 PATH: ${d}`);
       return;
     }
   }
 }
 
-function runNpmInstall(win, bundledTgz) {
-  return new Promise((resolve, reject) => {
-    // 确保 npm 在 PATH 中，然后用命令名调用（避免路径空格问题）
-    ensureNpmInPath();
-    const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    logger.info(`npm 命令: ${npmCmd}`);
-
-    // 将内置包复制到无空格的临时路径（避免路径空格问题）
-    let installTarget = null;
-    if (bundledTgz && fs.existsSync(bundledTgz)) {
-      if (bundledTgz.includes(' ')) {
-        const tempDir = path.join(os.tmpdir(), 'openclaw-install');
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-        installTarget = path.join(tempDir, 'openclaw-bundled.tgz');
-        fs.copyFileSync(bundledTgz, installTarget);
-        logger.info(`复制内置包到临时目录: ${installTarget}`);
-      } else {
-        installTarget = bundledTgz;
-      }
-    }
-
-    let args;
-    if (installTarget) {
-      logger.info(`使用内置 tarball 安装`);
-      args = ['install', '-g', installTarget, '--no-audit', '--no-fund'];
-    } else {
-      logger.info(`使用在线安装 openclaw@${OPENCLAW_VERSION}`);
-      args = ['install', '-g', `openclaw@${OPENCLAW_VERSION}`,
-        `--registry=${NPM_MIRROR}`,
-        '--no-audit', '--no-fund',
-      ];
-    }
-
-    const child = spawn(npmCmd, args, {
-      stdio: 'pipe',
-      env: { ...process.env },
-      windowsHide: true,
-      shell: true,
-    });
-
-    let stderr = '';
-    const startTime = Date.now();
-
-    // 进度估算：基于时间，从0%到90%
-    let estimatedPercent = 0;
-    const progressTimer = setInterval(() => {
-      if (estimatedPercent < 90) {
-        estimatedPercent += 2;
-        if (win && !win.isDestroyed()) {
-          win.webContents.send('install-progress', {
-            percent: estimatedPercent,
-            message: '正在安装 OpenClaw，请稍候...',
-          });
-        }
-      }
-    }, 3000);
-
-    child.stdout.on('data', (data) => {
-      const text = data.toString();
-      logger.info(`[npm] ${text.trim()}`);
-    });
-
-    child.stderr.on('data', (data) => {
-      const text = data.toString();
-      // 过滤 npm warn，只保留真正的错误
-      const lines = text.split('\n').filter(l => {
-        const trimmed = l.trim();
-        return trimmed && !trimmed.startsWith('npm warn') && !trimmed.startsWith('WARN');
-      });
-      if (lines.length > 0) {
-        stderr += lines.join('\n');
-        logger.info(`[npm err] ${lines.join(' ').trim()}`);
-      }
-    });
-
-    // 超时保护
-    const timeoutTimer = setTimeout(() => {
-      clearInterval(progressTimer);
-      child.kill();
-      reject(new Error(`安装超时（5分钟），请尝试手动执行:\nnpm install -g openclaw@${OPENCLAW_VERSION} --registry=${NPM_MIRROR}`));
-    }, INSTALL_TIMEOUT);
-
-    child.on('close', (code) => {
-      clearInterval(progressTimer);
-      clearTimeout(timeoutTimer);
-      if (code === 0) {
-        if (win && !win.isDestroyed()) {
-          win.webContents.send('install-progress', { percent: 100 });
-        }
-        resolve();
-      } else {
-        reject(new Error(`npm install 退出码: ${code}\n${stderr}`));
-      }
-    });
-
-    child.on('error', (err) => {
-      clearInterval(progressTimer);
-      clearTimeout(timeoutTimer);
-      reject(new Error(`无法执行 npm: ${err.message}\n请确认 Node.js 已正确安装。`));
-    });
-  });
-}
-
-function killOpenclawProcesses() {
+// 关闭运行中的 openclaw 进程（避免文件锁导致 EBUSY）
+function killRunningProcesses() {
   try {
     if (process.platform === 'win32') {
-      const output = execSync('tasklist /FO CSV /NH', { encoding: 'utf8', timeout: 10000 });
+      const out = execSync('tasklist /FO CSV /NH', { encoding: 'utf8', timeout: 10000 });
       const pids = [];
-      output.split('\n').forEach(line => {
-        const match = line.match(/"([^"]+)","(\d+)"/);
-        if (match) {
-          const name = match[1].toLowerCase();
-          if (name === 'openclaw.exe' || name === 'node.exe' && line.toLowerCase().includes('openclaw')) {
-            pids.push(match[2]);
-          }
-        }
+      out.split('\n').forEach(line => {
+        const m = line.match(/"([^"]+)","(\d+)"/);
+        if (m && m[1].toLowerCase() === 'openclaw.exe') pids.push(m[2]);
       });
       if (pids.length > 0) {
-        logger.info(`关闭 OpenClaw 进程: PID ${pids.join(', ')}`);
         execSync(`taskkill /F /PID ${pids.join(' /PID ')}`, { timeout: 10000 });
-        const start = Date.now();
-        while (Date.now() - start < 3000) {
-          try { execSync('tasklist /FI "IMAGENAME eq openclaw.exe" /NH', { encoding: 'utf8', timeout: 5000 }); } catch { break; }
-        }
+        logger.info(`已关闭 openclaw 进程: ${pids.join(', ')}`);
       }
     } else {
-      // macOS/Linux: 用 pkill 关闭 openclaw gateway 进程
-      try {
-        const out = execSync('pgrep -f "openclaw gateway" || true', { encoding: 'utf8', timeout: 5000 }).trim();
-        if (out) {
-          logger.info(`关闭 OpenClaw 进程: PID ${out.replace(/\n/g, ', ')}`);
-          execSync('pkill -f "openclaw gateway"', { timeout: 5000 });
-          setTimeout(() => {}, 2000);
-        }
-      } catch {}
+      execSync('pkill -f "openclaw gateway" 2>/dev/null || true', { timeout: 5000 });
     }
-  } catch (err) {
-    logger.warn(`关闭进程失败（可忽略）: ${err.message}`);
-  }
+  } catch {}
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
+// 确保 npm 全局目录存在（全新电脑可能没有 %APPDATA%\npm）
 function ensureNpmGlobalDir() {
   if (process.platform === 'win32') {
-    // Windows 上 npm 全局安装目录可能不存在，需要手动创建
-    const appData = process.env.APPDATA;
-    if (!appData) return;
-    const npmDir = path.join(appData, 'npm');
+    const npmDir = path.join(process.env.APPDATA || '', 'npm');
     if (!fs.existsSync(npmDir)) {
       fs.mkdirSync(npmDir, { recursive: true });
       logger.info(`创建 npm 全局目录: ${npmDir}`);
     }
-    const nmDir = path.join(npmDir, 'node_modules');
-    if (!fs.existsSync(nmDir)) {
-      fs.mkdirSync(nmDir, { recursive: true });
-      logger.info(`创建 node_modules 目录: ${nmDir}`);
-    }
-  } else {
-    // macOS/Linux: 确保 npm 全局 bin 目录存在
+  } else if (process.platform === 'darwin') {
+    // macOS: 确保 npm 全局 bin 目录存在
     try {
-      const prefix = execSync('npm config get prefix', { encoding: 'utf8', timeout: 5000 }).trim();
+      const prefix = execSync('npm config get prefix', { encoding: 'utf8', timeout: 5000, stdio: 'pipe' }).trim();
       const binDir = path.join(prefix, 'bin');
       if (!fs.existsSync(binDir)) {
         fs.mkdirSync(binDir, { recursive: true });
@@ -309,23 +131,142 @@ function ensureNpmGlobalDir() {
   }
 }
 
-function verifyOpenclaw() {
-  try {
-    // 刷新 PATH 以包含新安装的位置
-    const prefix = execSync('npm config get prefix', { encoding: 'utf8', timeout: 5000 }).trim();
-    const newPath = process.platform === 'win32'
-      ? prefix + ';' + process.env.PATH
-      : prefix + '/bin:' + process.env.PATH;
-    process.env.PATH = newPath;
+async function installOpenclaw(win) {
+  logger.info('开始安装 OpenClaw...');
 
-    const cmd = process.platform === 'win32' ? 'openclaw.cmd' : 'openclaw';
-    const ver = execSync(`"${cmd}" --version`, { timeout: 10000, encoding: 'utf8' }).trim();
-    logger.info(`安装验证: ${ver}`);
-    return true;
-  } catch (err) {
-    logger.warn(`安装验证失败: ${err.message}`);
-    return false;
+  // 刷新 PATH（Node.js 上一步刚装完）
+  ensureNpmInPath();
+
+  // 关闭运行中的 openclaw（老用户重新安装时，gateway 进程会锁文件导致 EBUSY）
+  killRunningProcesses();
+
+  // 确保 npm 全局目录存在（全新电脑可能没有 %APPDATA%\npm）
+  ensureNpmGlobalDir();
+
+  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+
+  // 确定安装来源
+  const bundledTgz = findBundledTgz();
+  let installTarget = null;
+
+  if (bundledTgz) {
+    // 内置包路径如果有空格（如 C:\Program Files\...），复制到临时目录
+    if (bundledTgz.includes(' ')) {
+      const tempDir = path.join(os.tmpdir(), 'openclaw-install');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      installTarget = path.join(tempDir, 'openclaw-bundled.tgz');
+      fs.copyFileSync(bundledTgz, installTarget);
+      logger.info(`复制内置包到: ${installTarget}`);
+    } else {
+      installTarget = bundledTgz;
+    }
   }
+
+  // 构造 npm install 命令
+  let args;
+  if (installTarget) {
+    logger.info(`使用内置包安装`);
+    args = ['install', '-g', installTarget, '--no-audit', '--no-fund'];
+  } else {
+    logger.info(`在线安装 openclaw@${OPENCLAW_VERSION}`);
+    args = ['install', '-g', `openclaw@${OPENCLAW_VERSION}`,
+      `--registry=${NPM_MIRROR}`, '--no-audit', '--no-fund'];
+  }
+
+  // 执行安装
+  await runCommand(npmCmd, args, win);
+
+  logger.info('OpenClaw 安装完成');
+
+  // 清理临时文件
+  if (installTarget && installTarget !== bundledTgz) {
+    try {
+      const tempDir = path.dirname(installTarget);
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {}
+  }
+
+  // 验证
+  ensureNpmInPath();
+  let verified = false;
+  let verifyReason = '';
+  try {
+    const cmd = process.platform === 'win32' ? 'openclaw.cmd' : 'openclaw';
+    const ver = execSync(`${cmd} --version`, { timeout: 10000, encoding: 'utf8', stdio: 'pipe' }).trim();
+    logger.info(`验证通过: ${ver}`);
+    verified = true;
+  } catch (err) {
+    verifyReason = err.message;
+    logger.warn(`验证失败: ${verifyReason}`);
+    // 检查文件是否存在（可能是 PATH 问题）
+    try {
+      const prefix = execSync(`${npmCmd} prefix -g`, { encoding: 'utf8', timeout: 5000, stdio: 'pipe' }).trim();
+      const exe = path.join(prefix, process.platform === 'win32' ? 'openclaw.cmd' : 'bin/openclaw');
+      if (fs.existsSync(exe)) {
+        verifyReason = `openclaw 已安装到 ${prefix}，但 PATH 未生效，请重启终端`;
+        logger.info(verifyReason);
+      }
+    } catch {}
+  }
+
+  return { success: true, verified, verifyReason };
+}
+
+function runCommand(cmd, args, win) {
+  return new Promise((resolve, reject) => {
+    logger.info(`执行: ${cmd} ${args.join(' ')}`);
+
+    const child = spawn(cmd, args, {
+      stdio: 'pipe',
+      env: { ...process.env },
+      windowsHide: true,
+      shell: true,
+    });
+
+    let stderr = '';
+    const timeout = setTimeout(() => {
+      child.kill();
+      reject(new Error('安装超时（5分钟）'));
+    }, 5 * 60 * 1000);
+
+    // 进度估算
+    let pct = 0;
+    const timer = setInterval(() => {
+      if (pct < 90) {
+        pct += 2;
+        if (win && !win.isDestroyed()) {
+          win.webContents.send('install-progress', { percent: pct, message: '正在安装 OpenClaw...' });
+        }
+      }
+    }, 3000);
+
+    child.stdout.on('data', (d) => { logger.info(`[npm] ${d.toString().trim()}`); });
+    child.stderr.on('data', (d) => {
+      const text = d.toString();
+      const lines = text.split('\n').filter(l => l.trim() && !l.trim().startsWith('npm warn'));
+      if (lines.length > 0) {
+        stderr += lines.join('\n');
+        logger.info(`[npm] ${lines.join(' ').trim()}`);
+      }
+    });
+
+    child.on('close', (code) => {
+      clearTimeout(timeout);
+      clearInterval(timer);
+      if (code === 0) {
+        if (win && !win.isDestroyed()) win.webContents.send('install-progress', { percent: 100 });
+        resolve();
+      } else {
+        reject(new Error(`npm install 退出码 ${code}\n${stderr}`));
+      }
+    });
+
+    child.on('error', (err) => {
+      clearTimeout(timeout);
+      clearInterval(timer);
+      reject(new Error(`无法执行 npm: ${err.message}`));
+    });
+  });
 }
 
 module.exports = installOpenclaw;

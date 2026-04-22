@@ -235,19 +235,19 @@ function refreshEnvPath() {
       logger.warn('PowerShell PATH 读取失败，尝试手动添加');
     }
 
-    // 备选：添加常见 Node.js 安装路径
+    // 备选：添加常见 Node.js 和 Git 安装路径
     const commonPaths = [
-      'C:\\Program Files\\nodejs',
-      pathModule.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs'),
-      pathModule.join(process.env.LOCALAPPDATA || '', 'Programs', 'nodejs'),
+      { dir: pathModule.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs'), check: 'node.exe' },
+      { dir: pathModule.join(process.env.LOCALAPPDATA || '', 'Programs', 'nodejs'), check: 'node.exe' },
+      { dir: pathModule.join(process.env.ProgramFiles || 'C:\\Program Files', 'Git', 'cmd'), check: 'git.exe' },
     ];
-    for (const p of commonPaths) {
-      if (p) {
+    for (const { dir, check } of commonPaths) {
+      if (dir) {
         try {
-          fsModule.accessSync(pathModule.join(p, 'node.exe'));
-          if (!process.env.PATH.toLowerCase().includes(p.toLowerCase())) {
-            process.env.PATH = p + ';' + process.env.PATH;
-            logger.info(`手动添加 ${p} 到 PATH`);
+          fsModule.accessSync(pathModule.join(dir, check));
+          if (!process.env.PATH.toLowerCase().includes(dir.toLowerCase())) {
+            process.env.PATH = dir + ';' + process.env.PATH;
+            logger.info(`手动添加 ${dir} 到 PATH`);
           }
         } catch {}
       }

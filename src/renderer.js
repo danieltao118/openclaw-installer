@@ -216,6 +216,9 @@ async function submitFeedback() {
   }
 }
 
+// 绑定反馈按钮（避免内联 onclick 被 CSP 阻止）
+$('#feedback-btn').addEventListener('click', submitFeedback);
+
 // ========== 打开日志文件 ==========
 async function openLogFile() {
   try {
