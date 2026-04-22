@@ -36,6 +36,7 @@ jobs:
   build:
     needs: test
     runs-on: macos-latest
+    timeout-minutes: 30
     name: 打包 macOS (ARM64 + Intel)
     steps:
       - uses: actions/checkout@v4
@@ -46,10 +47,8 @@ jobs:
       - name: 安装依赖
         run: npm install
 
-      - name: 下载离线资源
-        run: npm run prepare:bundled
-        env:
-          DOWNLOAD_ALL: 1
+      - name: 创建空 bundled 目录（CI 不下载离线资源，安装时在线下载）
+        run: mkdir -p bundled
 
       - name: 打包安装包
         run: npm run build:mac
