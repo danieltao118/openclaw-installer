@@ -21,7 +21,7 @@ win:
     - target: portable
       arch: [x64]
   icon: build/icon.ico
-  requestedExecutionLevel: requireAdministrator
+  requestedExecutionLevel: asInvoker
 portable:
   artifactName: OpenClaw-Portable.exe
 nsis:

@@ -207,9 +207,12 @@
             </div>
 
             <div id="feishu-scan-running" class="scan-state hidden">
-              <p class="scan-status">正在启动扫码流程...</p>
-              <div class="scan-terminal" id="feishu-terminal"></div>
-              <p class="scan-hint">请在弹出的终端窗口中扫描二维码</p>
+              <p class="scan-status" id="feishu-scan-status">正在生成二维码...</p>
+              <div class="scan-qr-container" id="feishu-qr-container">
+                <p style="color: #666; font-size: 13px;">正在生成二维码...</p>
+              </div>
+              <p class="scan-hint">请用飞书 App 扫描上方二维码</p>
+              <p class="scan-hint" id="feishu-countdown"></p>
             </div>
 
             <div id="feishu-scan-success" class="scan-state hidden">

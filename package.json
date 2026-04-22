@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "node-machine-id": "^1.1.12",
+    "qrcode": "^1.5.4",
     "sudo-prompt": "^9.2.1"
   },
   "devDependencies": {

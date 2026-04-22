@@ -23,14 +23,8 @@ contextBridge.exposeInMainWorld('installerAPI', {
   checkActivation: () => ipcRenderer.invoke('check-activation'),
   isPortableMode: () => ipcRenderer.invoke('is-portable-mode'),
   getVersions: () => ipcRenderer.invoke('get-versions'),
-  loginFeishuChannel: () => ipcRenderer.invoke('login-feishu-channel'),
-  onFeishuLoginOutput: (callback) => {
-    // 先移除旧监听，防止重复绑定
-    ipcRenderer.removeAllListeners('feishu-login-output');
-    const listener = (_event, data) => callback(data);
-    ipcRenderer.on('feishu-login-output', listener);
-    return () => ipcRenderer.removeListener('feishu-login-output', listener);
-  },
+  loginFeishuChannel: () => ipcRenderer.invoke('feishu-scan-init'),
+  feishuScanPoll: (deviceCode, interval, expireIn) => ipcRenderer.invoke('feishu-scan-poll', deviceCode, interval, expireIn),
   openLogFile: () => ipcRenderer.invoke('open-log-file'),
   // 反馈相关
   getSystemInfo: () => ipcRenderer.invoke('get-system-info'),

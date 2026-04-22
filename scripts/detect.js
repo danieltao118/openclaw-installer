@@ -91,14 +91,16 @@ async function detect(win, versions) {
     result.openclawVersion = ver;
     logger.info(`OpenClaw: 已安装 ${ver}`);
 
-    // 版本对比
+    // 版本对比 — 提取纯版本号，去除 "OpenClaw " 前缀和 "(hash)" 后缀
     if (versions && versions.openclaw) {
       result.openclawLatestVersion = versions.openclaw;
-      if (ver !== versions.openclaw) {
+      const verNum = ver.replace(/^OpenClaw\s+/i, '').replace(/\s+\(.+\)$/, '');
+      if (verNum !== versions.openclaw) {
         result.openclawNeedsUpdate = true;
-        logger.info(`OpenClaw 需要更新: ${ver} → ${versions.openclaw}`);
+        logger.info(`OpenClaw 需要更新: ${verNum} → ${versions.openclaw}`);
       } else {
         result.openclawNeedsUpdate = false;
+        logger.info(`OpenClaw 版本匹配: ${verNum}`);
       }
     }
   } catch {
@@ -134,9 +136,6 @@ function detectAntivirus() {
     '360Tray.exe': '360安全卫士',
     '360sd.exe': '360杀毒',
     'ZhuDongFangYu.exe': '360安全卫士（主动防御）',
-    'Huorong.exe': '火绒安全',
-    'wsctrl.exe': '火绒安全',
-    'usysdiag.exe': '火绒安全',
     'Kxetray.exe': '金山毒霸',
     'KSWebShield.exe': '金山毒霸',
     'QQPCTray.exe': '腾讯电脑管家',

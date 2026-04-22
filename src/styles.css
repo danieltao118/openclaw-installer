@@ -862,6 +862,21 @@ body {
   margin: 12px 0;
 }
 
+.scan-qr-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 16px 0;
+  padding: 16px;
+  background: #ffffff;
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+.scan-qr-container canvas {
+  display: block;
+}
+
 .scan-hint {
   font-size: 13px;
   color: var(--text-dim);

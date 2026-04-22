@@ -651,32 +651,68 @@ function showFeishuScanState(state) {
   $(`#${state}`).classList.remove('hidden');
 }
 
-// 监听飞书扫码输出
-window.installerAPI.onFeishuLoginOutput((data) => {
-  const terminal = $('#feishu-terminal');
-  if (terminal) {
-    terminal.textContent += data.text;
-    terminal.scrollTop = terminal.scrollHeight;
-  }
-});
+// 监听飞书扫码输出（已弃用 CLI 方式，保留兼容）
+// 飞书扫码现在直接调用飞书 API，在前端生成 QR 码
+
+// 简易 QR 码显示（使用 main 进程生成的 base64 图片）
+function showQRImage(dataUrl) {
+  const container = $('#feishu-qr-container');
+  if (!container) return;
+  container.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = dataUrl;
+  img.width = 256;
+  img.height = 256;
+  img.style.imageRendering = 'pixelated';
+  container.appendChild(img);
+}
 
 // 扫码按钮
 $('#btn-scan-feishu').addEventListener('click', async () => {
   const btn = $('#btn-scan-feishu');
   btn.disabled = true;
   showFeishuScanState('feishu-scan-running');
-  $('#feishu-terminal').textContent = '';
   appendLog('启动飞书扫码配置...');
 
   try {
-    const result = await window.installerAPI.loginFeishuChannel();
-    if (result.success) {
-      showFeishuScanState('feishu-scan-success');
-      appendLog('飞书扫码配置成功！');
-    } else {
-      $('#feishu-error-msg').textContent = '扫码配置失败: ' + (result.stderr || '未知错误').substring(0, 100);
+    // Step 1: 初始化并获取 QR URL
+    const initResult = await window.installerAPI.loginFeishuChannel();
+    if (!initResult.success) {
+      $('#feishu-error-msg').textContent = '扫码初始化失败: ' + (initResult.error || '未知错误');
       showFeishuScanState('feishu-scan-error');
-      appendLog('飞书扫码配置失败: ' + result.stderr);
+      appendLog('飞书扫码初始化失败: ' + initResult.error);
+      return;
+    }
+
+    // Step 2: 显示 QR 码图片
+    if (initResult.qrImage) {
+      showQRImage(initResult.qrImage);
+    }
+    const statusEl = $('#feishu-scan-status');
+    if (statusEl) statusEl.textContent = '请用飞书 App 扫描二维码';
+
+    // Step 3: 轮询扫码结果
+    const pollResult = await window.installerAPI.feishuScanPoll(
+      initResult.deviceCode,
+      initResult.interval,
+      initResult.expireIn
+    );
+
+    if (pollResult.status === 'success') {
+      showFeishuScanState('feishu-scan-success');
+      appendLog('飞书扫码配置成功！appId: ' + pollResult.appId);
+
+      // 自动保存凭据
+      await window.installerAPI.saveChannelConfig(pollResult.appId, pollResult.appSecret);
+      appendLog('飞书凭据已保存');
+    } else {
+      const msg = pollResult.status === 'timeout' ? '扫码超时，请重试'
+        : pollResult.status === 'denied' ? '授权被拒绝'
+        : pollResult.status === 'expired' ? '二维码已过期，请重试'
+        : pollResult.message || '未知错误';
+      $('#feishu-error-msg').textContent = msg;
+      showFeishuScanState('feishu-scan-error');
+      appendLog('飞书扫码失败: ' + msg);
     }
   } catch (err) {
     $('#feishu-error-msg').textContent = '扫码配置失败: ' + err.message;
@@ -736,18 +772,24 @@ $('#btn-skip-config').addEventListener('click', () => {
 
 // 启动 OpenClaw
 $('#btn-launch').addEventListener('click', async () => {
+  const btn = $('#btn-launch');
+  btn.disabled = true;
+  btn.textContent = '正在启动...';
   try {
     const result = await window.installerAPI.launchOpenclaw();
     if (result.success) {
-      appendLog('OpenClaw 网关已启动');
-      $('#config-final-msg').textContent = 'OpenClaw 网关已启动！可在飞书中测试对话。';
+      appendLog('OpenClaw 网关已启动，浏览器将自动打开');
+      $('#config-final-msg').textContent = 'OpenClaw 已启动！WebUI 页面正在浏览器中打开...';
     } else {
       appendLog('启动失败: ' + (result.error || '未知错误'));
-      $('#config-final-msg').textContent = '启动失败，请手动在终端运行: openclaw gateway start';
+      $('#config-final-msg').textContent = '启动失败，请手动在终端运行: openclaw gateway run';
     }
   } catch (err) {
     appendLog('启动失败: ' + err.message);
-    $('#config-final-msg').textContent = '启动失败，请手动在终端运行: openclaw gateway start';
+    $('#config-final-msg').textContent = '启动失败，请手动在终端运行: openclaw gateway run';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '启动 OpenClaw';
   }
 });
 

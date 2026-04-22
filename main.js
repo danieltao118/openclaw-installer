@@ -249,93 +249,99 @@ ipcMain.handle('check-activation', async (event) => {
 
 ipcMain.handle('launch-openclaw', async (event) => {
   const { spawn } = require('child_process');
+  const { shell } = require('electron');
+  const crypto = require('crypto');
   const logger = require('./scripts/logger');
   try {
     const cmd = getCmd('openclaw');
-    const child = spawn(cmd, ['gateway', 'start'], {
+
+    // 生成随机 token
+    const token = crypto.randomBytes(16).toString('hex');
+    logger.info(`生成 gateway token: ${token.substring(0, 8)}...`);
+
+    // 后台启动 gateway，传入 token
+    const child = spawn(cmd, ['gateway', 'run', '--allow-unconfigured', '--token', token], {
       detached: true,
       stdio: 'ignore',
       shell: process.platform === 'win32',
+      windowsHide: true,
       env: { ...process.env },
     });
     child.on('error', (err) => {
       logger.error(`启动 OpenClaw 失败: ${err.message}`);
     });
     child.unref();
+    logger.info('Gateway 进程已启动');
+
+    // 等待 gateway 就绪
+    const ready = await waitForGateway(15);
+    if (ready) {
+      const dashboardUrl = `http://127.0.0.1:18789/#token=${encodeURIComponent(token)}`;
+      logger.info(`打开 Dashboard: ${dashboardUrl.substring(0, 50)}...`);
+      await shell.openExternal(dashboardUrl);
+    } else {
+      logger.info('Gateway 等待超时，打开默认地址');
+      await shell.openExternal('http://127.0.0.1:18789');
+    }
+
     return { success: true };
   } catch (err) {
+    logger.error(`启动 OpenClaw 失败: ${err.message}`);
     return { success: false, error: err.message };
   }
 });
 
-// 飞书扫码登录 — 运行 openclaw channels login --channel feishu 并流式返回输出
-ipcMain.handle('login-feishu-channel', async (event) => {
-  const { spawn } = require('child_process');
+// 等待 gateway 就绪
+async function waitForGateway(maxRetries) {
+  const http = require('http');
+  for (let i = 0; i < maxRetries; i++) {
+    await new Promise(r => setTimeout(r, 1500));
+    try {
+      await new Promise((resolve, reject) => {
+        const req = http.get('http://127.0.0.1:18789/', { timeout: 3000 }, (res) => {
+          res.resume();
+          resolve(true);
+        });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+      });
+      return true;
+    } catch {
+      // 还没就绪，继续等待
+    }
+  }
+  return false;
+}
+
+// 飞书扫码登录 — 直接调用飞书 API，不依赖 openclaw CLI（CLI 的 QR 码需要 TTY）
+ipcMain.handle('feishu-scan-init', async () => {
   const logger = require('./scripts/logger');
+  try {
+    const scan = require('./scripts/feishu-scan');
+    const QR = require('qrcode');
+    await scan.initRegistration();
+    const begin = await scan.beginRegistration();
+    logger.info(`飞书扫码初始化成功, QR URL: ${begin.qrUrl.substring(0, 80)}...`);
 
-  return new Promise((resolve) => {
-    const cmd = getCmd('openclaw');
-    const args = ['channels', 'login', '--channel', 'feishu'];
+    // 在 main 进程生成 QR 码 base64 图片
+    const qrDataUrl = await QR.toDataURL(begin.qrUrl, { width: 256, margin: 2 });
 
-    logger.info(`执行飞书扫码登录: ${cmd} ${args.join(' ')}`);
+    return { success: true, qrImage: qrDataUrl, deviceCode: begin.deviceCode, interval: begin.interval, expireIn: begin.expireIn };
+  } catch (err) {
+    logger.error(`飞书扫码初始化失败: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+});
 
-    const child = spawn(cmd, args, {
-      shell: process.platform === 'win32',
-      env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
-      cwd: require('os').homedir(),
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    child.stdout.on('data', (data) => {
-      const text = data.toString();
-      stdout += text;
-      // 流式转发到前端
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('feishu-login-output', { text, stream: 'stdout' });
-      }
-    });
-
-    child.stderr.on('data', (data) => {
-      const text = data.toString();
-      stderr += text;
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('feishu-login-output', { text, stream: 'stderr' });
-      }
-    });
-
-    child.on('close', (code) => {
-      logger.info(`飞书扫码登录完成, exit code: ${code}`);
-      resolve({
-        success: code === 0,
-        code,
-        stdout,
-        stderr,
-      });
-    });
-
-    child.on('error', (err) => {
-      logger.error(`飞书扫码登录失败: ${err.message}`);
-      resolve({
-        success: false,
-        code: -1,
-        stdout,
-        stderr: err.message,
-      });
-    });
-
-    // 超时保护：3分钟无操作自动终止
-    const timeout = setTimeout(() => {
-      child.kill();
-      resolve({
-        success: false,
-        code: -1,
-        stdout,
-        stderr: '操作超时，请重试',
-      });
-    }, 3 * 60 * 1000);
-
-    child.on('close', () => clearTimeout(timeout));
-  });
+ipcMain.handle('feishu-scan-poll', async (event, deviceCode, interval, expireIn) => {
+  const logger = require('./scripts/logger');
+  try {
+    const scan = require('./scripts/feishu-scan');
+    const result = await scan.pollRegistration(deviceCode, interval, expireIn);
+    logger.info(`飞书扫码结果: ${result.status}`);
+    return result;
+  } catch (err) {
+    logger.error(`飞书扫码轮询失败: ${err.message}`);
+    return { status: 'error', message: err.message };
+  }
 });
