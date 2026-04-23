@@ -36,11 +36,18 @@ function ensureNpmInPath() {
   const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
   const sep = process.platform === 'win32' ? ';' : ':';
 
-  // 先检查 npm 是否已经可用
-  try {
-    execSync(`${npmCmd} --version`, { timeout: 5000, stdio: 'pipe' });
-    return;
-  } catch {}
+  // 先检查 npm 是否已经可用（带重试，Node.js 刚装完可能需要等一下）
+  for (let i = 0; i < 3; i++) {
+    try {
+      execSync(`${npmCmd} --version`, { timeout: 5000, stdio: 'pipe' });
+      return;
+    } catch {
+      if (i < 2) {
+        logger.info(`npm 暂不可用，等待后重试 (${i + 1}/3)...`);
+        execSync('timeout /t 2 /nobreak >nul 2>&1 || sleep 2', { shell: true, timeout: 5000 });
+      }
+    }
+  }
 
   // macOS: 从 login shell 刷新 PATH
   if (process.platform === 'darwin') {

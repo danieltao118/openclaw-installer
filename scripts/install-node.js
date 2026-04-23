@@ -136,6 +136,9 @@ async function installNode(win) {
     }
   }
 
+  // 等待文件系统同步（MSI 安装后文件可能还没完全落盘）
+  await sleep(2000);
+
   // 刷新 PATH
   refreshPath();
 
