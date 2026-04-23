@@ -227,7 +227,7 @@ function installMacGit(win) {
 
     try {
       const sudo = require('sudo-prompt');
-      const options = { name: 'OpenClaw 安装向导' };
+      const options = { name: 'OpenClaw Installer' };
       sudo.exec(`installer -pkg "${pkgPath}" -target /`, options, (error, stdout, stderr) => {
         if (error) {
           logger.error(`macOS Git 安装失败: ${error.message}`);

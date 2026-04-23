@@ -266,7 +266,7 @@ function installMacTarball(tarPath, win) {
 
     try {
       const sudo = require('sudo-prompt');
-      const options = { name: 'OpenClaw 安装向导' };
+      const options = { name: 'OpenClaw Installer' };
       // 解压到 /usr/local，Node.js tarball 内部自带 node-v22.x.x-darwin-xxx 目录结构
       const cmd = `tar -xzf "${tarPath}" -C /usr/local --strip-components=1`;
       sudo.exec(cmd, options, (error, stdout, stderr) => {
@@ -291,7 +291,7 @@ function installMacPkg(pkgPath, win) {
 
     try {
       const sudo = require('sudo-prompt');
-      const options = { name: 'OpenClaw 安装向导' };
+      const options = { name: 'OpenClaw Installer' };
 
       sudo.exec(`installer -pkg "${pkgPath}" -target /`, options, (error, stdout, stderr) => {
         if (error) {
