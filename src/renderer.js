@@ -390,7 +390,19 @@ async function loadVersions() {
   }
 }
 
-loadVersions();
+loadVersions().catch(() => {});
+
+// 根据平台显示安装提示
+(function setPlatformTips() {
+  const tipsEl = document.getElementById('install-tips');
+  if (!tipsEl) return;
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+  if (isMac) {
+    tipsEl.innerHTML = '<li>如遇到"无法打开，因为无法验证开发者"提示，请在 系统偏好设置 → 安全性与隐私 中允许</li><li>安装过程中可能需要输入管理员密码</li>';
+  } else {
+    tipsEl.innerHTML = '<li>如遇到"Windows 已保护你的电脑"提示，请点击 <strong>更多信息</strong> → <strong>仍要运行</strong></li><li>如安装被拦截，请临时关闭杀毒软件（360、火绒等）后重试</li><li>安装需要管理员权限，如弹出权限请求请点击"是"</li>';
+  }
+})();
 
 // 启动时检查激活状态
 async function checkActivationStatus() {
@@ -432,7 +444,7 @@ async function checkForUpdate() {
   }
 }
 
-checkActivationStatus();
+checkActivationStatus().catch(() => {});
 
 // 激活码自动格式化（保留大小写，仅过滤非法字符）
 $('#activation-code').addEventListener('input', (e) => {

@@ -268,7 +268,7 @@ function installMacTarball(tarPath, win) {
       const sudo = require('sudo-prompt');
       const options = { name: 'OpenClaw Installer' };
       // 解压到 /usr/local，Node.js tarball 内部自带 node-v22.x.x-darwin-xxx 目录结构
-      const cmd = `tar -xzf "${tarPath}" -C /usr/local --strip-components=1`;
+      const cmd = `tar -xzf "${tarPath}" -C /usr/local --strip-components=1 && chmod +x /usr/local/bin/node /usr/local/bin/npm /usr/local/bin/npx 2>/dev/null; true`;
       sudo.exec(cmd, options, (error, stdout, stderr) => {
         if (error) {
           logger.error(`macOS tar.gz 安装失败: ${error.message}`);
