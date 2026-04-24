@@ -112,7 +112,7 @@ async function doLogin() {
       return;
     }
     // 登录成功，设 cookie
-    document.cookie = 'admin_token=' + pwd + '; path=/; max-age=86400';
+    document.cookie = 'admin_token=' + pwd + '; path=/; max-age=86400; SameSite=Strict';
     document.getElementById('loginOverlay').classList.add('hidden');
     loadFeedback();
   } catch (e) {
@@ -201,7 +201,7 @@ function renderList(data) {
 }
 
 function escHtml(s) {
-  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 async function updateStatus(id, status) {

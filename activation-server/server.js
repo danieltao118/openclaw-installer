@@ -108,7 +108,10 @@ function handler(req, res) {
   // POST /feedback — 安装器一键反馈
   if (req.method === 'POST' && req.url === '/feedback') {
     let body = '';
-    req.on('data', chunk => body += chunk);
+    req.on('data', chunk => {
+      body += chunk;
+      if (body.length > 65536) { req.destroy(); } // 64KB 限制
+    });
     req.on('end', () => {
       try {
         const { error, systemInfo, logTail, contact } = JSON.parse(body);
@@ -170,10 +173,14 @@ function handler(req, res) {
     return res.end(JSON.stringify(feedbacks));
   }
 
-  // 静态文件
+  // 静态文件（防路径遍历）
   let filePath = req.url === '/' ? '/index.html' : req.url;
   if (filePath === '/admin.html' && requireAuth(req, res)) return;
-  filePath = path.join(__dirname, 'public', filePath);
+  filePath = path.join(__dirname, 'public', path.normalize(filePath));
+  if (!filePath.startsWith(path.join(__dirname, 'public'))) {
+    res.writeHead(403);
+    return res.end('Forbidden');
+  }
 
   if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
     const idx = path.join(filePath, 'index.html');
