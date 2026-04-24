@@ -6,8 +6,26 @@ const path = require('path');
 const PORT = process.env.PORT || 3000;
 const CODES_FILE = path.join(__dirname, 'codes.json');
 const FEEDBACK_FILE = path.join(__dirname, 'feedback.json');
-// 飞书 webhook（配置后自动通知）
 const FEISHU_WEBHOOK = process.env.FEISHU_WEBHOOK || '';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'xzsxopenclawAI2026';
+
+// 管理端点认证
+const ADMIN_PATHS = ['/stats', '/api/codes', '/api/codes.csv', '/api/feedback'];
+function checkAuth(req) {
+  const cookie = (req.headers.cookie || '');
+  if (cookie.split(';').some(c => c.trim() === `admin_token=${ADMIN_PASSWORD}`)) return true;
+  const auth = req.headers.authorization || '';
+  if (auth === `Bearer ${ADMIN_PASSWORD}`) return true;
+  return false;
+}
+function requireAuth(req, res) {
+  if (!checkAuth(req)) {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: false, msg: '需要管理员密码' }));
+    return true;
+  }
+  return false;
+}
 
 // 加载激活码数据
 function loadCodes() {
@@ -40,56 +58,15 @@ function handler(req, res) {
     return res.end();
   }
 
-  // POST /claim — 领取激活码
+  // POST /claim — 已停止发放
   if (req.method === 'POST' && req.url === '/claim') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', () => {
-      try {
-        const { phone } = JSON.parse(body);
-        if (!phone || !/^1\d{10}$/.test(phone)) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ ok: false, msg: '请输入正确的手机号' }));
-        }
-
-        const data = loadCodes();
-
-        // 检查是否已领取
-        const existing = data.codes.find(c => c.phone === phone);
-        if (existing) {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({
-            ok: true,
-            code: existing.code,
-            msg: '您已领取过激活码',
-            claimedAt: existing.claimedAt,
-          }));
-        }
-
-        // 找一个未领取的码
-        const available = data.codes.find(c => !c.phone);
-        if (!available) {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ ok: false, msg: '激活码已发放完毕' }));
-        }
-
-        // 分配
-        available.phone = phone;
-        available.claimedAt = new Date().toISOString();
-        saveCodes(data);
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, code: available.code }));
-      } catch (e) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: false, msg: '请求格式错误' }));
-      }
-    });
-    return;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ ok: false, msg: '激活码已停止发放，请联系顾问老师领取', stopped: true }));
   }
 
   // GET /stats — 查看发放统计（管理员）
   if (req.method === 'GET' && req.url === '/stats') {
+    if (requireAuth(req, res)) return;
     const data = loadCodes();
     const total = data.codes.length;
     const claimed = data.codes.filter(c => c.phone).length;
@@ -99,6 +76,7 @@ function handler(req, res) {
 
   // GET /api/codes — 已领取激活码列表（含手机号）
   if (req.method === 'GET' && req.url === '/api/codes') {
+    if (requireAuth(req, res)) return;
     const data = loadCodes();
     const claimed = data.codes.filter(c => c.phone).map(c => ({
       phone: c.phone,
@@ -111,6 +89,7 @@ function handler(req, res) {
 
   // GET /api/codes.csv — 导出CSV
   if (req.method === 'GET' && req.url === '/api/codes.csv') {
+    if (requireAuth(req, res)) return;
     const data = loadCodes();
     const bom = Buffer.from([0xEF, 0xBB, 0xBF]);
     let csv = '手机号,激活码,领取时间\n';
@@ -182,6 +161,7 @@ function handler(req, res) {
 
   // GET /api/feedback — 反馈数据API
   if (req.method === 'GET' && req.url === '/api/feedback') {
+    if (requireAuth(req, res)) return;
     let feedbacks = [];
     if (fs.existsSync(FEEDBACK_FILE)) {
       feedbacks = JSON.parse(fs.readFileSync(FEEDBACK_FILE, 'utf8'));
@@ -192,9 +172,15 @@ function handler(req, res) {
 
   // 静态文件
   let filePath = req.url === '/' ? '/index.html' : req.url;
+  if (filePath === '/admin.html' && requireAuth(req, res)) return;
   filePath = path.join(__dirname, 'public', filePath);
 
-  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+    const idx = path.join(filePath, 'index.html');
+    if (fs.existsSync(idx)) filePath = idx;
+    else { res.writeHead(404); return res.end('Not Found'); }
+  }
+  if (!fs.existsSync(filePath)) {
     res.writeHead(404);
     return res.end('Not Found');
   }

@@ -36,24 +36,115 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #0
 .btn-detail { background: rgba(255,255,255,0.06); color: #e0e0e8; }
 .empty { text-align: center; padding: 60px; color: #555; font-size: 0.95rem; }
 .refresh { padding: 6px 16px; background: rgba(233,69,96,0.15); color: #e94560; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-family: inherit; }
+
+/* 登录遮罩 */
+.login-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.85);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+.login-box {
+  background: #1a1a2e; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px; padding: 36px; width: 340px; text-align: center;
+}
+.login-box h2 { color: #fff; margin-bottom: 8px; font-size: 1.2rem; }
+.login-box p { color: #888; font-size: 0.85rem; margin-bottom: 24px; }
+.login-box input {
+  width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+  color: #fff; font-size: 1rem; outline: none; margin-bottom: 16px;
+  font-family: inherit;
+}
+.login-box input:focus { border-color: #e94560; }
+.login-box button {
+  width: 100%; padding: 12px; background: linear-gradient(135deg, #e94560, #c23152);
+  color: #fff; border: none; border-radius: 8px; font-size: 1rem;
+  font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.login-box .login-err { color: #ef4444; font-size: 0.85rem; margin-top: 12px; min-height: 20px; }
+.hidden { display: none !important; }
 </style>
 </head>
 <body>
+
+<!-- 登录遮罩 -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <h2>管理员登录</h2>
+    <p>请输入管理密码</p>
+    <input type="password" id="loginPwd" placeholder="管理密码" onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()">登录</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
 <div class="header">
   <h1>OpenClaw 安装器反馈管理</h1>
   <div>
     <button class="refresh" onclick="loadFeedback()">刷新</button>
-    <a href="/api/codes.csv" style="background:rgba(74,222,128,0.15);color:#4ade80;padding:6px 16px;border-radius:6px;font-size:0.85rem;">下载领取记录CSV</a>
-    <a href="/">← 返回领取页</a>
+    <button class="btn btn-resolve" onclick="downloadCSV()" style="margin-left:8px;">下载领取记录CSV</button>
+    <a href="/" style="margin-left:12px;">← 返回领取页</a>
   </div>
 </div>
 <div class="stats" id="stats"></div>
 <div class="list" id="list"></div>
 
 <script>
+async function checkLogin() {
+  try {
+    const resp = await fetch('/api/feedback');
+    if (resp.status === 401) return false;
+    return true;
+  } catch { return false; }
+}
+
+async function doLogin() {
+  const pwd = document.getElementById('loginPwd').value;
+  const errEl = document.getElementById('loginErr');
+  errEl.textContent = '';
+  try {
+    const resp = await fetch('/api/feedback', {
+      headers: { 'Authorization': 'Bearer ' + pwd }
+    });
+    if (resp.status === 401) {
+      errEl.textContent = '密码错误';
+      return;
+    }
+    // 登录成功，设 cookie
+    document.cookie = 'admin_token=' + pwd + '; path=/; max-age=86400';
+    document.getElementById('loginOverlay').classList.add('hidden');
+    loadFeedback();
+  } catch (e) {
+    errEl.textContent = '网络错误';
+  }
+}
+
+async function downloadCSV() {
+  try {
+    const resp = await fetch('/api/codes.csv');
+    if (resp.status === 401) {
+      alert('请先登录');
+      return;
+    }
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'activation-codes.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    alert('下载失败');
+  }
+}
+
 async function loadFeedback() {
   try {
     const resp = await fetch('/api/feedback');
+    if (resp.status === 401) {
+      document.getElementById('loginOverlay').classList.remove('hidden');
+      return;
+    }
     const data = await resp.json();
     renderStats(data);
     renderList(data);
@@ -113,27 +204,26 @@ function escHtml(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// 本地更新状态（简化版，存到 localStorage 标记）
 async function updateStatus(id, status) {
-  // 先获取当前数据，修改后存回（需要服务端支持，这里先用本地标记）
   const resp = await fetch('/api/feedback');
   const data = await resp.json();
   const item = data.find(f => f.id === id);
   if (item) {
     item.status = status;
-    // 写回服务端（复用 feedback.json 写入）
-    // 暂时用本地方式：重新POST不太合适，直接标记
-    const { writeFeedbacks } = window;
-    // 简化：直接刷新页面，用 fetch PUT
   }
-  // 临时方案：本地标记
   let marks = JSON.parse(localStorage.getItem('feedback-marks') || '{}');
   marks[id] = status;
   localStorage.setItem('feedback-marks', JSON.stringify(marks));
   loadFeedback();
 }
 
-loadFeedback();
+// 页面加载时检查登录状态
+checkLogin().then(loggedIn => {
+  if (loggedIn) {
+    document.getElementById('loginOverlay').classList.add('hidden');
+    loadFeedback();
+  }
+});
 
 // 覆盖渲染，应用本地标记
 const origRender = renderList;

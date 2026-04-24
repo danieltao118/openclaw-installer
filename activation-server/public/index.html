@@ -359,6 +359,20 @@ async function claimCode() {
       msg.className = 'msg success';
       msg.textContent = data.msg === '您已领取过激活码' ? '您之前已领取，码不变' : '领取成功！';
       btn.textContent = '已领取';
+    } else if (data.stopped) {
+      msg.className = 'msg error';
+      msg.textContent = data.msg;
+      btn.textContent = '领取安装器激活码';
+      btn.disabled = false;
+      result.className = 'result show';
+      result.style.background = 'rgba(233,69,96,0.06)';
+      result.style.borderColor = 'rgba(233,69,96,0.15)';
+      result.innerHTML = `
+        <div class="result-label" style="color:#e94560;font-weight:700;font-size:1rem;">激活码已停止发放</div>
+        <p style="color:#a0a0b8;font-size:0.9rem;margin:12px 0 20px;">请联系您的顾问老师获取激活码</p>
+        <img src="/qr.png" style="width:200px;height:200px;border-radius:12px;margin:0 auto;display:block;" alt="联系顾问老师">
+        <p style="color:#888;font-size:0.8rem;margin-top:12px;">扫描二维码联系顾问老师</p>
+      `;
     } else {
       msg.className = 'msg error';
       msg.textContent = data.msg || '领取失败';
