@@ -80,6 +80,13 @@ if (!fs.existsSync(claudeCli)) {
   process.exit(1);
 }
 
+// 检查便携 git
+const gitBinDir = path.join(__dirname, 'portable-git', 'bin');
+const gitExecPath = path.join(__dirname, 'portable-git', 'libexec', 'git-core');
+if (fs.existsSync(path.join(gitBinDir, 'git'))) {
+  log('INFO', '便携 Git 找到', gitBinDir);
+}
+
 const env = {
   ...process.env,
   // API 配置
@@ -93,7 +100,8 @@ const env = {
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
   // macOS: HOME 指向U盘，Claude Code 配置和历史写到U盘
   HOME: claudeHome,
-  PATH: path.join(__dirname, 'portable-node', 'bin') + ':' + (process.env.PATH || ''),
+  PATH: (fs.existsSync(gitBinDir) ? gitBinDir + ':' : '') + path.join(__dirname, 'portable-node', 'bin') + ':' + (process.env.PATH || ''),
+  ...(fs.existsSync(gitExecPath) ? { GIT_EXEC_PATH: gitExecPath } : {}),
 };
 
 // 3. 启动 Claude Code
@@ -102,7 +110,7 @@ console.log('正在启动 Claude Code (macOS 便携模式)...');
 console.log('配置目录: ' + claudeDir);
 console.log('');
 
-const child = spawn(nodeExe, [claudeCli, ...extraArgs], {
+const child = spawn(nodeExe, ['--max-old-space-size=4096', claudeCli, ...extraArgs], {
   stdio: 'inherit',
   env,
   shell: false,

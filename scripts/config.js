@@ -48,16 +48,141 @@ function writeConfig(config) {
 }
 
 // 保存模型配置
-async function saveModelConfig(provider, apiKey, baseUrl, model) {
-  logger.info(`保存模型配置: provider=${provider}, model=${model}`);
+async function saveModelConfig(provider, apiKey, baseUrl, model, apiProtocol) {
+  logger.info(`保存模型配置: provider=${provider}, model=${model}, apiProtocol=${apiProtocol || 'default'}`);
 
+  // 1. 写入 auth-profiles.json（OpenClaw 运行时从这里读取 API Key）
+  const agentsDir = path.join(OPENCLAW_DIR, 'agents', 'main', 'agent');
+  const authFile = path.join(agentsDir, 'auth-profiles.json');
+  if (!fs.existsSync(agentsDir)) fs.mkdirSync(agentsDir, { recursive: true });
+
+  let authData = { version: 1, profiles: {} };
+  try {
+    if (fs.existsSync(authFile)) {
+      authData = JSON.parse(fs.readFileSync(authFile, 'utf8'));
+      if (!authData.profiles) authData.profiles = {};
+    }
+  } catch {}
+
+  authData.profiles[`${provider}:manual`] = {
+    type: 'api_key',
+    provider: provider,
+    key: apiKey,
+  };
+  fs.writeFileSync(authFile, JSON.stringify(authData, null, 2), 'utf8');
+  logger.info(`API Key 已保存到 auth-profiles.json`);
+
+  // 2. 写入 models.json（provider baseUrl + 模型列表）
+  const modelsFile = path.join(agentsDir, 'models.json');
+  let modelsData = { providers: {} };
+  try {
+    if (fs.existsSync(modelsFile)) {
+      modelsData = JSON.parse(fs.readFileSync(modelsFile, 'utf8'));
+      if (!modelsData.providers) modelsData.providers = {};
+    }
+  } catch {}
+
+  const providerApiMap = {
+    anthropic: 'anthropic-messages',
+    openai: 'openai-completions',
+    zai: 'openai-completions',
+    deepseek: 'openai-completions',
+    qwen: 'openai-completions',
+    kimi: 'anthropic-messages',
+    minimax: 'openai-completions',
+    stepfun: 'openai-completions',
+  };
+
+  const providerBaseUrlMap = {
+    zai: 'https://open.bigmodel.cn/api/coding/paas/v4',
+    qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    kimi: 'https://api.kimi.com/coding/v1',
+    minimax: 'https://api.minimax.chat/v1',
+    deepseek: 'https://api.deepseek.com/v1',
+    stepfun: 'https://api.stepfun.com/v1',
+  };
+
+  const providerModelsMap = {
+    zai: [
+      { id: 'glm-5v-turbo', name: 'GLM-5V Turbo', api: 'openai-completions', reasoning: true, input: ['text', 'image'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 204800, maxTokens: 131072 },
+      { id: 'glm-5', name: 'GLM-5', api: 'openai-completions', reasoning: true, input: ['text'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 204800, maxTokens: 131072 },
+      { id: 'glm-4.7', name: 'GLM-4.7', api: 'openai-completions', reasoning: true, input: ['text'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 204800, maxTokens: 131072 },
+      { id: 'glm-4.5-air', name: 'GLM-4.5-Air', api: 'openai-completions', input: ['text'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 128000, maxTokens: 4096 },
+    ],
+    qwen: [
+      { id: 'qwen-max', name: 'Qwen Max', api: 'openai-completions', contextWindow: 32768, maxTokens: 8192 },
+      { id: 'qwen-plus', name: 'Qwen Plus', api: 'openai-completions', contextWindow: 131072, maxTokens: 8192 },
+      { id: 'qwen-turbo', name: 'Qwen Turbo', api: 'openai-completions', contextWindow: 131072, maxTokens: 8192 },
+      { id: 'qwen3-coder-plus', name: 'Qwen3 Coder Plus', api: 'openai-completions', contextWindow: 131072, maxTokens: 16384 },
+    ],
+    kimi: [
+      { id: 'kimi-code', name: 'Kimi Code', api: 'anthropic-messages' },
+      { id: 'k2p5', name: 'K2P5', api: 'anthropic-messages' },
+    ],
+    deepseek: [
+      { id: 'deepseek-chat', name: 'DeepSeek Chat', api: 'openai-completions', contextWindow: 65536, maxTokens: 8192 },
+      { id: 'deepseek-coder', name: 'DeepSeek Coder', api: 'openai-completions', contextWindow: 65536, maxTokens: 16384 },
+    ],
+    minimax: [
+      { id: 'MiniMax-Text-01', name: 'MiniMax-Text-01', api: 'openai-completions', contextWindow: 1024000, maxTokens: 16384 },
+    ],
+  };
+
+  const effectiveBaseUrl = baseUrl || providerBaseUrlMap[provider] || '';
+  const effectiveApi = apiProtocol || providerApiMap[provider] || 'openai-completions';
+
+  // 清理旧 provider 残留（zhipu → zai 迁移等）
+  const providerAliases = { zai: ['zhipu'], kimi: ['moonshot'] };
+  const aliases = providerAliases[provider] || [];
+  for (const alias of aliases) {
+    if (modelsData.providers[alias]) {
+      delete modelsData.providers[alias];
+      logger.info(`清理旧 provider: ${alias} → ${provider}`);
+    }
+    const oldAuthKey = `${alias}:manual`;
+    if (authData.profiles[oldAuthKey]) {
+      delete authData.profiles[oldAuthKey];
+      logger.info(`清理旧 auth profile: ${oldAuthKey}`);
+    }
+  }
+
+  modelsData.providers[provider] = {
+    baseUrl: effectiveBaseUrl,
+    api: effectiveApi,
+  };
+
+  if (providerModelsMap[provider]) {
+    modelsData.providers[provider].models = providerModelsMap[provider];
+  }
+
+  fs.writeFileSync(modelsFile, JSON.stringify(modelsData, null, 2), 'utf8');
+  logger.info(`模型配置已保存到 models.json`);
+
+  // 3. 更新 openclaw.json 默认模型
   const config = readConfig();
+  if (!config.agents) config.agents = {};
+  if (!config.agents.defaults) config.agents.defaults = {};
 
-  // 设置环境变量形式的 API Key
+  config.agents.defaults.model = {
+    primary: `${provider}/${model}`,
+  };
+
+  // 关键：必须同时设置 models 映射，否则 OpenClaw 会 fallback 到内置模型
+  if (!config.agents.defaults.models) config.agents.defaults.models = {};
+  config.agents.defaults.models[`${provider}/${model}`] = {};
+
+  // 确保 gateway auth 模式正确，避免旧配置导致 token mismatch
+  if (!config.gateway) config.gateway = {};
+  if (!config.gateway.auth) config.gateway.auth = {};
+  config.gateway.auth.mode = 'token';
+
+  writeConfig(config);
+
+  // 4. 同时写入 .env 作为兜底
   const envKeyMap = {
     anthropic: 'ANTHROPIC_API_KEY',
     openai: 'OPENAI_API_KEY',
-    zhipu: 'ZHIPU_API_KEY',
+    zai: 'ZAI_API_KEY',
     deepseek: 'DEEPSEEK_API_KEY',
     qwen: 'DASHSCOPE_API_KEY',
     kimi: 'MOONSHOT_API_KEY',
@@ -65,69 +190,16 @@ async function saveModelConfig(provider, apiKey, baseUrl, model) {
     stepfun: 'STEPFUN_API_KEY',
     custom: 'CUSTOM_API_KEY',
   };
-
   const envKey = envKeyMap[provider];
-
-  // 写入 .env 文件
-  const envFile = path.join(OPENCLAW_DIR, '.env');
-  let envContent = '';
-  if (fs.existsSync(envFile)) {
-    envContent = fs.readFileSync(envFile, 'utf8');
-  }
-
-  // 更新或添加 API Key
-  const envLines = envContent.split('\n').filter(l => l.trim());
-  const existingIdx = envLines.findIndex(l => l.startsWith(envKey + '='));
-  if (existingIdx >= 0) {
-    envLines[existingIdx] = `${envKey}=${apiKey}`;
-  } else {
-    envLines.push(`${envKey}=${apiKey}`);
-  }
-  fs.writeFileSync(envFile, envLines.join('\n') + '\n', 'utf8');
-  logger.info(`API Key 已保存到 ${envFile}`);
-
-  // 更新 openclaw.json 中的模型配置
-  if (!config.agents) config.agents = {};
-  if (!config.agents.defaults) config.agents.defaults = {};
-
-  const modelMap = {
-    'anthropic': `anthropic/${model}`,
-    'openai': `openai/${model}`,
-    'zhipu': `zhipu/${model}`,
-    'deepseek': `deepseek/${model}`,
-    'qwen': `qwen/${model}`,
-    'kimi': `moonshot/${model}`,
-    'minimax': `minimax/${model}`,
-    'stepfun': `stepfun/${model}`,
-    'custom': model, // 通用模式直接使用模型ID
-  };
-
-  config.agents.defaults.model = {
-    primary: modelMap[provider] || model,
-  };
-
-  if (baseUrl) {
-    if (!config.agents.defaults.models) config.agents.defaults.models = {};
-    config.agents.defaults.models[modelMap[provider]] = {
-      baseUrl: baseUrl,
-    };
-  }
-
-  writeConfig(config);
-
-  // CLI 同步为可选操作，失败不影响配置文件写入
-  try {
-    const cmd = getCmd('openclaw');
-    // 使用 --yes 跳过交互确认
-    execSync(`"${cmd}" config set agents.defaults.model.primary "${modelMap[provider]}" --yes`, {
-      timeout: 10000,
-      encoding: 'utf8',
-      stdio: 'pipe', // 静默输出，避免 stderr 报错干扰
-    });
-    logger.info('已通过 CLI 更新模型配置');
-  } catch (err) {
-    // CLI 失败不影响配置（配置已直接写入文件）
-    logger.info('CLI 配置同步跳过（配置已通过文件写入）');
+  if (envKey) {
+    const envFile = path.join(OPENCLAW_DIR, '.env');
+    let envContent = '';
+    if (fs.existsSync(envFile)) envContent = fs.readFileSync(envFile, 'utf8');
+    const envLines = envContent.split('\n').filter(l => l.trim());
+    const idx = envLines.findIndex(l => l.startsWith(envKey + '='));
+    if (idx >= 0) envLines[idx] = `${envKey}=${apiKey}`;
+    else envLines.push(`${envKey}=${apiKey}`);
+    fs.writeFileSync(envFile, envLines.join('\n') + '\n', 'utf8');
   }
 
   return { success: true };
@@ -144,7 +216,7 @@ async function saveChannelConfig(appId, appSecret) {
     enabled: true,
     appId: appId,
     appSecret: appSecret,
-    dmPolicy: 'pairing',
+    dmPolicy: 'open',
   };
 
   writeConfig(config);
@@ -172,9 +244,9 @@ async function testApiConnection(provider, apiKey, baseUrl) {
   logger.info(`测试 API 连接: ${provider}`);
 
   const testUrls = {
-    zhipu: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+    zai: 'https://open.bigmodel.cn/api/coding/paas/v4/chat/completions',
     qwen: 'https://dashscope.aliyuncs.com/compatible-mode/v1/models',
-    kimi: 'https://api.moonshot.cn/v1/models',
+    kimi: 'https://api.kimi.com/coding/v1/models',
     minimax: 'https://api.minimax.chat/v1/models',
     stepfun: 'https://api.stepfun.com/v1/models',
   };
@@ -197,15 +269,15 @@ async function testApiConnection(provider, apiKey, baseUrl) {
       'Authorization': `Bearer ${apiKey}`,
     };
 
-    // Anthropic 使用 x-api-key 头
-    if (provider === 'anthropic') {
+    // Anthropic 和 Kimi 使用 x-api-key 头
+    if (provider === 'anthropic' || provider === 'kimi') {
       delete headers['Authorization'];
       headers['x-api-key'] = apiKey;
       headers['anthropic-version'] = '2023-06-01';
     }
 
     // 智谱用 chat completions 端点，用 POST 发一个最小请求验证
-    if (provider === 'zhipu') {
+    if (provider === 'zai') {
       const postData = JSON.stringify({
         model: 'glm-4-flash',
         messages: [{ role: 'user', content: 'hi' }],
@@ -225,7 +297,7 @@ async function testApiConnection(provider, apiKey, baseUrl) {
         res.on('data', (chunk) => body += chunk);
         res.on('end', () => {
           if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve({ ok: true, message: '连接成功！智谱 API Key 有效' });
+            resolve({ ok: true, message: '连接成功！GLM Coding Plan API Key 有效' });
           } else if (res.statusCode === 401 || res.statusCode === 403) {
             resolve({ ok: false, message: 'API Key 无效或已过期，请检查' });
           } else {

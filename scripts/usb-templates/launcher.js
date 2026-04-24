@@ -34,7 +34,7 @@ if (!tmpPassPath || !fs.existsSync(tmpPassPath)) {
 }
 
 // 从临时文件读取密码，读完后立即删除
-const password = fs.readFileSync(tmpPassPath, 'utf8').trim();
+const password = fs.readFileSync(tmpPassPath, 'utf8').replace(/^﻿/, '').trim();
 try { fs.unlinkSync(tmpPassPath); } catch {}
 
 // 1. 解密 API Key
@@ -113,7 +113,7 @@ console.log('正在启动 Claude Code (便携模式)...');
 console.log('配置目录: ' + claudeDir);
 console.log('');
 
-const child = spawn(nodeExe, [claudeCli, ...extraArgs], {
+const child = spawn(nodeExe, ['--max-old-space-size=4096', claudeCli, ...extraArgs], {
   stdio: 'inherit',
   env,
   shell: false,

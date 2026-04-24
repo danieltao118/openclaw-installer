@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { spawn: childSpawn } = require('child_process');
 
 // 加载版本配置
 function loadVersions() {
@@ -56,6 +57,18 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
+
+  // 外部链接在系统浏览器中打开，而不是 Electron 窗口内
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    require('electron').shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (url !== mainWindow.webContents.getURL()) {
+      event.preventDefault();
+      require('electron').shell.openExternal(url);
+    }
+  });
 }
 
 app.whenReady().then(() => {
@@ -91,6 +104,27 @@ app.on('window-all-closed', () => {
 // 跨平台命令名辅助
 function getCmd(name) {
   return process.platform === 'win32' ? name + '.cmd' : name;
+}
+
+// Windows 上隐藏窗口启动命令
+function spawnHidden(command, args, options) {
+  const isWin = process.platform === 'win32';
+  if (isWin) {
+    // 用 cmd /c 调用 .cmd 文件，通过 windowsHide 隐藏窗口
+    return childSpawn('cmd', ['/c', command, ...args], {
+      ...options,
+      shell: false,
+      windowsHide: true,
+      stdio: 'ignore',
+      detached: true,
+    });
+  }
+  return childSpawn(command, args, {
+    ...options,
+    shell: false,
+    stdio: 'ignore',
+    detached: true,
+  });
 }
 
 // 便携模式日志 — 错误写入U盘
@@ -183,9 +217,9 @@ ipcMain.handle('verify-installation', async (event) => {
 });
 
 // 配置相关 IPC
-ipcMain.handle('save-model-config', async (event, provider, apiKey, baseUrl, model) => {
+ipcMain.handle('save-model-config', async (event, provider, apiKey, baseUrl, model, apiProtocol) => {
   const config = require('./scripts/config');
-  return config.saveModelConfig(provider, apiKey, baseUrl, model);
+  return config.saveModelConfig(provider, apiKey, baseUrl, model, apiProtocol);
 });
 
 ipcMain.handle('save-channel-config', async (event, appId, appSecret) => {
@@ -317,6 +351,14 @@ ipcMain.handle('launch-openclaw', async (event) => {
   try {
     const cmd = getCmd('openclaw');
 
+    // 注册为系统服务（开机自启动）
+    try {
+      execSync(`"${cmd}" gateway install`, { timeout: 10000, stdio: 'pipe' });
+      logger.info('Gateway 系统服务已注册（开机自启动）');
+    } catch (err) {
+      logger.info('Gateway 服务注册跳过: ' + (err.message || ''));
+    }
+
     // macOS: 确保 npm 全局路径在 PATH 中
     if (process.platform !== 'win32') {
       try {
@@ -341,55 +383,78 @@ ipcMain.handle('launch-openclaw', async (event) => {
       logger.info(`生成新 token: ${token.substring(0, 8)}...`);
     }
 
-    // 先检查 gateway 是否已经在运行
+    // 先停掉旧 gateway，避免 token 冲突和配置残留
+    try {
+      execSync(`"${cmd}" gateway stop`, { timeout: 5000, stdio: 'pipe' });
+      logger.info('已停掉旧 gateway');
+      // 等待旧进程完全退出，避免竞态
+      await new Promise(r => setTimeout(r, 5000));
+    } catch {}
+
+    // 等待后再检查（此时旧进程应该已退出）
+    const DEFAULT_PORT = 18789;
+    let gatewayPort = DEFAULT_PORT;
     const alreadyRunning = await checkGatewayHealth();
     if (alreadyRunning) {
       logger.info('Gateway 已在运行，直接打开 Dashboard');
     } else {
-      // 杀掉占用端口的旧进程
+      // 检查默认端口是否被其他程序占用
+      let portInUse = false;
       if (process.platform === 'win32') {
         try {
           const out = execSync('netstat -ano | findstr :18789 | findstr LISTENING', { encoding: 'utf8', timeout: 5000 });
-          const pid = out.trim().match(/\s+(\d+)\s*$/)?.[1];
-          if (pid) { execSync(`taskkill /F /PID ${pid}`, { timeout: 5000 }); logger.info(`杀掉旧 gateway PID: ${pid}`); }
+          if (out.trim()) portInUse = true;
         } catch {}
       } else {
-        // macOS/Linux: 用 lsof 找到占用端口的进程
         try {
           const out = execSync('lsof -ti:18789', { encoding: 'utf8', timeout: 5000 }).trim();
-          if (out) {
-            const pids = out.split('\n').filter(Boolean);
-            for (const pid of pids) {
-              execSync(`kill -9 ${pid}`, { timeout: 5000 });
-              logger.info(`杀掉旧 gateway PID: ${pid}`);
-            }
-          }
+          if (out) portInUse = true;
         } catch {}
       }
 
-      // 启动 gateway（detached 让它在安装器关闭后继续运行）
-      const child = spawn(cmd, ['gateway', 'run', '--allow-unconfigured', '--token', token], {
-        detached: true,
-        stdio: 'ignore',
-        shell: process.platform === 'win32',
-        windowsHide: true,
-        env: { ...process.env },
-      });
-      child.on('error', (err) => {
-        logger.error(`启动 OpenClaw 失败: ${err.message}`);
-      });
-      child.unref();
-      logger.info(`Gateway 进程已启动 PID: ${child.pid}`);
-
-      // 等待 gateway 就绪（最多60秒，每2秒检查一次）
-      const ready = await waitForGateway(30, 2000);
-      if (!ready) {
-        return { success: false, error: 'Gateway 启动超时（60秒），请稍后重试' };
+      if (portInUse) {
+        // 端口被其他程序占用，尝试用 --force 强制接管（会杀掉自己的旧 gateway）
+        // 如果 --force 失败，则自动换端口
+        logger.info('端口 18789 被占用，尝试 --force 接管');
+        try {
+          const child = spawnHidden(cmd, ['gateway', 'run', '--allow-unconfigured', '--token', token, '--force'], {
+            env: { ...process.env },
+          });
+          child.on('error', () => {});
+          child.unref();
+          const ready = await waitForGateway(20, 2000);
+          if (!ready) throw new Error('force failed');
+        } catch {
+          // force 失败，换端口
+          gatewayPort = 18790;
+          logger.info('换到端口 18790');
+          const child = spawnHidden(cmd, ['gateway', 'run', '--allow-unconfigured', '--token', token, '--port', '18790'], {
+            env: { ...process.env },
+          });
+          child.on('error', (err) => { logger.error(`启动 OpenClaw 失败: ${err.message}`); });
+          child.unref();
+          const ready = await waitForGateway(20, 2000, 18790);
+          if (!ready) {
+            return { success: false, error: 'Gateway 启动超时，请检查端口是否被占用' };
+          }
+        }
+      } else {
+        // 端口空闲，正常启动
+        const child = spawnHidden(cmd, ['gateway', 'run', '--allow-unconfigured', '--token', token], {
+          env: { ...process.env },
+        });
+        child.on('error', (err) => { logger.error(`启动 OpenClaw 失败: ${err.message}`); });
+        child.unref();
+        logger.info(`Gateway 进程已启动 PID: ${child.pid}`);
+        const ready = await waitForGateway(30, 2000);
+        if (!ready) {
+          return { success: false, error: 'Gateway 启动超时（60秒），请稍后重试' };
+        }
       }
     }
 
     // 打开带 token 的 Dashboard
-    const dashboardUrl = `http://127.0.0.1:18789/#token=${encodeURIComponent(token)}`;
+    const dashboardUrl = `http://127.0.0.1:${gatewayPort}/#token=${encodeURIComponent(token)}`;
     logger.info(`打开 Dashboard: ${dashboardUrl.substring(0, 50)}...`);
     await shell.openExternal(dashboardUrl);
 
@@ -401,11 +466,11 @@ ipcMain.handle('launch-openclaw', async (event) => {
 });
 
 // 检查 gateway 是否已在运行
-async function checkGatewayHealth() {
+async function checkGatewayHealth(port = 18789) {
   const http = require('http');
   try {
     return await new Promise((resolve) => {
-      const req = http.get('http://127.0.0.1:18789/health', { timeout: 3000 }, (res) => {
+      const req = http.get(`http://127.0.0.1:${port}/health`, { timeout: 3000 }, (res) => {
         let data = '';
         res.on('data', (c) => { data += c; });
         res.on('end', () => {
@@ -419,10 +484,10 @@ async function checkGatewayHealth() {
 }
 
 // 等待 gateway 就绪
-async function waitForGateway(maxRetries, intervalMs) {
+async function waitForGateway(maxRetries, intervalMs, port = 18789) {
   for (let i = 0; i < maxRetries; i++) {
     await new Promise(r => setTimeout(r, intervalMs || 2000));
-    const ok = await checkGatewayHealth();
+    const ok = await checkGatewayHealth(port);
     if (ok) return true;
   }
   return false;

@@ -144,7 +144,7 @@
           <div class="form-group">
             <label>选择 AI 模型提供商</label>
             <select id="cfg-provider">
-              <option value="zhipu">智谱AI (GLM)</option>
+              <option value="zai">智谱AI (GLM Coding Plan)</option>
               <option value="qwen">阿里云百炼 (通义千问)</option>
               <option value="kimi">Kimi (月之暗面)</option>
               <option value="minimax">MiniMax</option>
@@ -164,6 +164,14 @@
             <label>API 地址</label>
             <input type="text" id="cfg-baseurl" placeholder="" class="form-input">
             <span class="form-hint">留空使用默认地址，通用模式需填写完整的 API 地址</span>
+          </div>
+          <div class="form-group">
+            <label>API 协议</label>
+            <select id="cfg-api-protocol">
+              <option value="openai-completions">OpenAI Completions (大多数国内供应商)</option>
+              <option value="anthropic-messages">Anthropic Messages (Claude/Kimi)</option>
+            </select>
+            <span class="form-hint">不确定就选 OpenAI Completions</span>
           </div>
           <div class="form-group">
             <label>模型 ID</label>

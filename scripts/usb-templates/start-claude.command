@@ -75,38 +75,32 @@ if [ $? -ne 0 ]; then
 fi
 echo "  Node.js: $NODE_VER"
 
-# ========== 首次运行：安装 git ==========
-GIT_PKG="git-mac.pkg"
+# ========== 首次运行：修复便携 git 符号链接 ==========
 GIT_BIN="$SCRIPT_DIR/portable-git/bin/git"
-if ! command -v git &>/dev/null && [ ! -f "$GIT_BIN" ]; then
-    echo ""
-    echo "  [Setup] Installing portable Git..."
-    # 尝试从U盘的 .pkg 安装（需要 sudo）
-    if [ -f "$SCRIPT_DIR/$GIT_PKG" ]; then
-        echo "  Found $GIT_PKG on USB. Installing (requires admin password)..."
-        sudo installer -pkg "$SCRIPT_DIR/$GIT_PKG" -target / 2>/dev/null
-        if [ $? -eq 0 ]; then
-            echo "  Git installed OK."
-        else
-            echo "  [WARN] pkg install failed. Trying xcode-select..."
-            xcode-select --install 2>/dev/null
-            echo "  Please run this script again after installation completes."
-            read -p "  Press Enter to exit..."
-            exit 1
-        fi
-    else
-        echo "  $GIT_PKG not found on USB."
-        echo "  Installing Xcode Command Line Tools instead..."
-        xcode-select --install 2>/dev/null
-        echo "  Please run this script again after installation completes."
-        read -p "  Press Enter to exit..."
-        exit 1
-    fi
+if [ -f "$GIT_BIN" ] && [ ! -f "$GIT_BIN.exec" ]; then
+    # 便携 git 已预提取，修复 Windows 无法保存的符号链接
+    chmod +x "$GIT_BIN" 2>/dev/null
+    LINK_COUNT=0
+    while IFS= read -r -d '' LINKFILE; do
+        TARGET=$(cat "$LINKFILE")
+        REALFILE="${LINKFILE%.link}"
+        rm -f "$REALFILE" 2>/dev/null
+        ln -sf "$TARGET" "$REALFILE" 2>/dev/null
+        rm -f "$LINKFILE" 2>/dev/null
+        LINK_COUNT=$((LINK_COUNT + 1))
+    done < <(find "$SCRIPT_DIR/portable-git" -name '*.link' -print0 2>/dev/null)
+    # 标记已修复
+    touch "$GIT_BIN.exec"
+    echo "  Git symlinks fixed ($LINK_COUNT)."
 fi
-if command -v git &>/dev/null; then
-    echo "  Git: $(git --version)"
-elif [ -f "$GIT_BIN" ]; then
+
+# 添加便携 git 到 PATH
+if [ -f "$GIT_BIN" ]; then
+    export PATH="$SCRIPT_DIR/portable-git/bin:$PATH"
+    export GIT_EXEC_PATH="$SCRIPT_DIR/portable-git/libexec/git-core"
     echo "  Git: $($GIT_BIN --version) (portable)"
+elif command -v git &>/dev/null; then
+    echo "  Git: $(git --version) (system)"
 else
     echo "  Git: [WARN] not available"
 fi

@@ -12,8 +12,8 @@ contextBridge.exposeInMainWorld('installerAPI', {
     return () => ipcRenderer.removeListener('install-progress', listener);
   },
   // 配置相关
-  saveModelConfig: (provider, apiKey, baseUrl, model) =>
-    ipcRenderer.invoke('save-model-config', provider, apiKey, baseUrl, model),
+  saveModelConfig: (provider, apiKey, baseUrl, model, apiProtocol) =>
+    ipcRenderer.invoke('save-model-config', provider, apiKey, baseUrl, model, apiProtocol),
   saveChannelConfig: (appId, appSecret) =>
     ipcRenderer.invoke('save-channel-config', appId, appSecret),
   testApiConnection: (provider, apiKey, baseUrl) =>

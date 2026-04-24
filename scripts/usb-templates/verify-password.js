@@ -19,7 +19,7 @@ if (!keyfilePath || !tmpPassPath) {
 
 try {
   const storedHash = fs.readFileSync(keyfilePath, 'utf8').trim();
-  const password = fs.readFileSync(tmpPassPath, 'utf8').trim();
+  const password = fs.readFileSync(tmpPassPath, 'utf8').replace(/^﻿/, '').trim();
   const hash = crypto.createHash('sha256').update(password).digest('hex');
 
   if (hash === storedHash) {

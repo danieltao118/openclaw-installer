@@ -416,7 +416,29 @@ async function checkActivationStatus() {
       $('#activation-done-text').textContent = `已激活 · ${status.typeName} · 剩余 ${status.daysLeft} 天`;
       appendLog(`激活状态: ${status.typeName}, 剩余 ${status.daysLeft} 天`);
 
-      // 已激活用户检查是否有更新
+      // 检查 OpenClaw 是否已安装
+      try {
+        const env = await window.installerAPI.detectEnvironment();
+        if (env.openclawStatus === 'installed') {
+          // 已安装：改为快捷启动模式
+          $('#btn-start').textContent = '启动 OpenClaw';
+          $('#btn-start').onclick = () => {
+            showStep('config');
+            updateTopProgress(100, '配置');
+            appendLog('OpenClaw 已安装，直接进入配置');
+          };
+          appendLog('OpenClaw 已安装，可直接启动');
+
+          // 同时更新欢迎页描述
+          const desc = document.querySelector('.desc');
+          if (desc) desc.textContent = 'OpenClaw 已安装。点击下方按钮启动或重新配置。';
+
+          checkForUpdate();
+          return;
+        }
+      } catch {}
+
+      // 未安装：保持原有的安装流程
       checkForUpdate();
     }
   } catch (err) {
@@ -544,11 +566,12 @@ $$('.config-tab').forEach(tab => {
 
 // 提供商-模型联动
 const PROVIDER_MODELS = {
-  zhipu: {
-    hint: '在 open.bigmodel.cn 获取 API Key',
-    defaultModel: 'glm-5.1',
-    models: ['glm-5.1', 'glm-4.7', 'glm-4-flash', 'glm-4-plus', 'glm-4-long', 'glm-4-air'],
-    defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+  zai: {
+    hint: '在 open.bigmodel.cn 获取 API Key（GLM Coding Plan）',
+    defaultModel: 'glm-5v-turbo',
+    models: ['glm-5v-turbo', 'glm-5', 'glm-4.7', 'glm-4.5-air'],
+    defaultBaseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4',
+    defaultApi: 'openai-completions',
     keyUrl: 'https://www.bigmodel.cn/invite?icode=fUalT%2FJzsW3InfvOR%2Blk9pmwcr074zMJTpgMb8zZZvg%3D',
   },
   qwen: {
@@ -556,13 +579,15 @@ const PROVIDER_MODELS = {
     defaultModel: 'qwen-max',
     models: ['qwen-max', 'qwen-plus', 'qwen-turbo', 'qwen-long', 'qwen3-235b-a22b', 'qwen3-32b', 'qwen3-coder-plus'],
     defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    defaultApi: 'openai-completions',
     keyUrl: 'https://bailian.console.aliyun.com/cn-beijing/?spm=5176.38070734.nav-v2-dropdown-menu-0.d_main_2_0_0.12a934c9LVTTQl&tab=coding-plan&scm=20140722.M_10979710._.V_1#/efm/coding-plan-index',
   },
   kimi: {
-    hint: '在 platform.moonshot.cn 获取 API Key',
-    defaultModel: 'moonshot-v1-128k',
-    models: ['moonshot-v1-128k', 'moonshot-v1-32k', 'moonshot-v1-8k', 'kimi-latest'],
-    defaultBaseUrl: 'https://api.moonshot.cn/v1',
+    hint: '在 kimi.com 获取 Kimi Code API Key',
+    defaultModel: 'kimi-code',
+    models: ['kimi-code', 'k2p5'],
+    defaultBaseUrl: 'https://api.kimi.com/coding/v1',
+    defaultApi: 'anthropic-messages',
     keyUrl: 'https://www.kimi.com/membership/pricing?from=kfc_membership_topbar&track_id=428673fa-1954-4d84-814d-59b3d4efe2d6',
   },
   minimax: {
@@ -570,6 +595,7 @@ const PROVIDER_MODELS = {
     defaultModel: 'MiniMax-Text-01',
     models: ['MiniMax-Text-01', 'abab6.5s-chat', 'abab6.5g-chat', 'abab7-chat-preview'],
     defaultBaseUrl: 'https://api.minimax.chat/v1',
+    defaultApi: 'openai-completions',
     keyUrl: 'https://platform.minimaxi.com/subscribe/token-plan',
   },
   custom: {
@@ -577,6 +603,7 @@ const PROVIDER_MODELS = {
     defaultModel: '',
     models: [],
     defaultBaseUrl: '',
+    defaultApi: 'openai-completions',
     keyUrl: '',
   },
 };
@@ -609,6 +636,12 @@ function updateProviderUI() {
   } else {
     modelInput.value = '';
     modelInput.placeholder = '输入模型 ID，例如: deepseek-chat';
+  }
+
+  // 更新协议选择默认值
+  const protocolSelect = $('#cfg-api-protocol');
+  if (protocolSelect && info.defaultApi) {
+    protocolSelect.value = info.defaultApi;
   }
 
   // 预填 Base URL placeholder
@@ -654,6 +687,7 @@ $('#btn-save-model').addEventListener('click', async () => {
   const apiKey = $('#cfg-apikey').value.trim();
   const baseUrl = $('#cfg-baseurl').value.trim();
   const model = $('#cfg-model').value.trim();
+  const apiProtocol = $('#cfg-api-protocol') ? $('#cfg-api-protocol').value : '';
 
   if (!apiKey) {
     $('#test-api-result').textContent = '请输入 API Key';
@@ -662,7 +696,7 @@ $('#btn-save-model').addEventListener('click', async () => {
   }
 
   try {
-    await window.installerAPI.saveModelConfig(provider, apiKey, baseUrl, model);
+    await window.installerAPI.saveModelConfig(provider, apiKey, baseUrl, model, apiProtocol);
     appendLog('模型配置已保存');
     $$('.config-tab')[1].click();
   } catch (err) {

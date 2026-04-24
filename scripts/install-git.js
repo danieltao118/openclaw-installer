@@ -124,6 +124,10 @@ function runSilentInstall(exePath) {
         // Inno Setup 退出码 0=成功, 1=成功但需重启
         logger.info(`Git 安装完成 (退出码: ${code})`);
         resolve();
+      } else if (code === 5) {
+        // 退出码 5 = 访问被拒绝，需要管理员权限
+        logger.info('Git 退出码 5，尝试提权安装...');
+        elevateGitInstall(exePath).then(resolve).catch(reject);
       } else {
         logger.error(`Git 安装失败 (退出码: ${code}): ${stderr}`);
         reject(new Error(`Git 安装失败 (退出码: ${code})`));
@@ -134,6 +138,22 @@ function runSilentInstall(exePath) {
       clearTimeout(timeout);
       reject(new Error(`无法执行 Git 安装程序: ${err.message}`));
     });
+  });
+}
+
+function elevateGitInstall(exePath) {
+  return new Promise((resolve, reject) => {
+    logger.info('通过 PowerShell 提权安装 Git...');
+    const args = `/VERYSILENT /NORESTART /NOCANCEL /SP- /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS /o:PathOption=BashOnly /o:SSHOption=OpenSSH`;
+    const cmd = `powershell -Command "Start-Process '${exePath}' -ArgumentList '${args}' -Verb RunAs -Wait"`;
+    try {
+      execSync(cmd, { timeout: 300000 });
+      logger.info('提权安装 Git 完成');
+      resolve();
+    } catch (err) {
+      logger.error(`提权安装 Git 失败: ${err.message}`);
+      reject(new Error('Git 安装需要管理员权限。请右键安装器 → 以管理员身份运行。'));
+    }
   });
 }
 

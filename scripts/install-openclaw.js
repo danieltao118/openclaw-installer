@@ -150,6 +150,12 @@ async function installOpenclaw(win) {
   // 确保 npm 全局目录存在（全新电脑可能没有 %APPDATA%\npm）
   ensureNpmGlobalDir();
 
+  // Git 配置 HTTPS 替代 SSH（避免 git@github.com 权限错误）
+  try {
+    execSync('git config --global url."https://github.com/".insteadOf ssh://git@github.com/', { timeout: 5000, stdio: 'pipe' });
+    logger.info('Git: 已配置 HTTPS 替代 SSH');
+  } catch {}
+
   const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
   // 确定安装来源
@@ -173,7 +179,7 @@ async function installOpenclaw(win) {
   let args;
   if (installTarget) {
     logger.info(`使用内置包安装`);
-    args = ['install', '-g', installTarget, '--no-audit', '--no-fund'];
+    args = ['install', '-g', installTarget, `--registry=${NPM_MIRROR}`, '--no-audit', '--no-fund'];
   } else {
     logger.info(`在线安装 openclaw@${OPENCLAW_VERSION}`);
     args = ['install', '-g', `openclaw@${OPENCLAW_VERSION}`,
@@ -233,8 +239,8 @@ function runCommand(cmd, args, win) {
     let stderr = '';
     const timeout = setTimeout(() => {
       child.kill();
-      reject(new Error('安装超时（5分钟）'));
-    }, 5 * 60 * 1000);
+      reject(new Error('安装超时（10分钟）'));
+    }, 10 * 60 * 1000);
 
     // 进度估算
     let pct = 0;
