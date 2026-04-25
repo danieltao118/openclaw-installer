@@ -111,12 +111,14 @@ function getCmd(name) {
 function spawnHidden(command, args, options) {
   const isWin = process.platform === 'win32';
   if (isWin) {
-    // 用 PowerShell -WindowStyle Hidden 彻底隐藏所有子进程窗口
-    const fullCmd = `"${command}" ${args.join(' ')}`;
+    // PowerShell -WindowStyle Hidden 隐藏窗口
+    // 用 & 调用运算符避免引号路径解析问题
+    const escapedCmd = command.replace(/'/g, "''");
+    const escapedArgs = args.map(a => `'${a.replace(/'/g, "''")}'`).join(' ');
     return childSpawn('powershell.exe', [
       '-WindowStyle', 'Hidden',
       '-NonInteractive',
-      '-Command', fullCmd,
+      '-Command', `& '${escapedCmd}' ${escapedArgs}`,
     ], {
       ...options,
       shell: false,
