@@ -420,12 +420,18 @@ async function checkActivationStatus() {
       try {
         const env = await window.installerAPI.detectEnvironment();
         if (env.openclawStatus === 'installed') {
-          // 已安装：改为快捷启动模式
-          $('#btn-start').textContent = '启动 OpenClaw';
+          // 已安装：改为快捷启动模式，直接进入控制面板
+          $('#btn-start').textContent = '控制面板';
           $('#btn-start').onclick = () => {
             showStep('config');
-            updateTopProgress(100, '配置');
-            appendLog('OpenClaw 已安装，直接进入配置');
+            updateTopProgress(100, '控制面板');
+            // 切到控制面板 tab
+            $$('.config-tab').forEach(t => t.classList.remove('active'));
+            $$('.config-panel').forEach(p => p.classList.remove('active'));
+            $('[data-tab="tab-dashboard"]').classList.add('active');
+            $('#tab-dashboard').classList.add('active');
+            refreshDashboard();
+            appendLog('OpenClaw 已安装，进入控制面板');
           };
           appendLog('OpenClaw 已安装，可直接启动');
 
@@ -468,7 +474,7 @@ async function checkForUpdate() {
 
 checkActivationStatus().catch(() => {});
 
-// 激活码自动格式化（保留大小写，仅过滤非法字符）
+// 激活码自动格式化（过滤非法字符，保留原始大小写）
 $('#activation-code').addEventListener('input', (e) => {
   let val = e.target.value.replace(/[^A-Za-z0-9-]/g, '');
   e.target.value = val;
@@ -561,7 +567,161 @@ $$('.config-tab').forEach(tab => {
     tab.classList.add('active');
     $$('.config-panel').forEach(p => p.classList.remove('active'));
     $(`#${targetId}`).classList.add('active');
+    if (targetId === 'tab-dashboard') refreshDashboard();
   });
+});
+
+// ========== 控制面板 ==========
+
+async function refreshDashboard() {
+  const dot = $('#gw-status-dot');
+  const text = $('#gw-status-text');
+  const info = $('#gw-info');
+  const modelInfo = $('#gw-model-info');
+  const feishuDot = $('#feishu-status-dot');
+  const feishuText = $('#feishu-status-text');
+  const feishuInfo = $('#feishu-status-info');
+  const reconfigFeishu = $('#btn-reconfig-feishu');
+
+  if (!dot) return;
+  dot.className = 'status-dot checking';
+  text.textContent = '检测中...';
+
+  try {
+    const status = await window.installerAPI.gatewayStatus();
+    if (status.running) {
+      dot.className = 'status-dot online';
+      text.textContent = 'Gateway 运行中';
+      info.textContent = 'http://127.0.0.1:18789';
+    } else {
+      dot.className = 'status-dot offline';
+      text.textContent = 'Gateway 未运行';
+      info.textContent = '点击「启动 Gateway」开启服务';
+    }
+    modelInfo.textContent = status.model || '未设置';
+
+    // 飞书通道状态
+    if (feishuDot) {
+      if (status.hasFeishu) {
+        feishuDot.className = 'status-dot online';
+        feishuText.textContent = '飞书通道已连接';
+        feishuInfo.textContent = '机器人已就绪，可接收飞书消息';
+        if (reconfigFeishu) reconfigFeishu.textContent = '重新配置飞书通道 →';
+      } else {
+        feishuDot.className = 'status-dot offline';
+        feishuText.textContent = '飞书通道未配置';
+        feishuInfo.textContent = '配置后可通过飞书与 AI 助手对话';
+        if (reconfigFeishu) reconfigFeishu.textContent = '配置飞书通道 →';
+      }
+    }
+
+    // 微信通道状态
+    const wechatDot = $('#wechat-status-dot');
+    const wechatText = $('#wechat-status-text');
+    const wechatInfo = $('#wechat-status-info');
+    const reconfigWechat = $('#btn-reconfig-wechat');
+    if (wechatDot) {
+      if (status.hasWeixin) {
+        wechatDot.className = 'status-dot online';
+        wechatText.textContent = '微信通道已连接';
+        wechatInfo.textContent = '机器人已就绪，可接收微信消息';
+        if (reconfigWechat) reconfigWechat.textContent = '重新配置微信通道 →';
+      } else {
+        wechatDot.className = 'status-dot offline';
+        wechatText.textContent = '微信通道未配置';
+        wechatInfo.textContent = '配置后可通过微信与 AI 助手对话';
+        if (reconfigWechat) reconfigWechat.textContent = '配置微信通道 →';
+      }
+    }
+  } catch {
+    dot.className = 'status-dot offline';
+    text.textContent = '检测失败';
+    info.textContent = '';
+  }
+}
+
+$('#btn-gw-start').addEventListener('click', async () => {
+  const btn = $('#btn-gw-start');
+  btn.disabled = true;
+  btn.textContent = '启动中...';
+  try {
+    const result = await window.installerAPI.launchOpenclaw();
+    if (result.success) {
+      appendLog('Gateway 已启动');
+    } else {
+      appendLog('Gateway 启动失败: ' + (result.error || '未知错误'));
+    }
+  } catch (err) {
+    appendLog('启动失败: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '启动 Gateway';
+    refreshDashboard();
+  }
+});
+
+$('#btn-gw-stop').addEventListener('click', async () => {
+  const btn = $('#btn-gw-stop');
+  btn.disabled = true;
+  try {
+    await window.installerAPI.gatewayStop();
+    await new Promise(r => setTimeout(r, 2000));
+    appendLog('Gateway 已停止');
+  } catch (err) {
+    appendLog('停止失败: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    refreshDashboard();
+  }
+});
+
+$('#btn-gw-restart').addEventListener('click', async () => {
+  const btn = $('#btn-gw-restart');
+  btn.disabled = true;
+  btn.textContent = '重启中...';
+  try {
+    const result = await window.installerAPI.gatewayRestart();
+    if (result.success) {
+      appendLog('Gateway 已重启');
+    } else {
+      appendLog('Gateway 重启失败: ' + (result.error || '未知错误'));
+    }
+  } catch (err) {
+    appendLog('重启失败: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '重启';
+    refreshDashboard();
+  }
+});
+
+$('#btn-reconfig-model').addEventListener('click', () => {
+  $$('.config-tab')[1].click(); // 切到 AI模型 tab
+});
+
+$('#btn-reconfig-feishu').addEventListener('click', () => {
+  $$('.config-tab')[2].click(); // 切到飞书通道 tab
+});
+
+$('#btn-open-webui').addEventListener('click', async () => {
+  try {
+    const status = await window.installerAPI.gatewayStatus();
+    if (!status.running) {
+      appendLog('Gateway 未运行，请先启动');
+      return;
+    }
+    const url = await window.installerAPI.getDashboardUrl();
+    window.open(url, '_blank');
+  } catch (err) {
+    appendLog('打开 WebUI 失败: ' + err.message);
+  }
+});
+
+$('#btn-open-log4').addEventListener('click', () => { openLogFile(); });
+
+$('#btn-close2').addEventListener('click', () => {
+  try { window.installerAPI.selfDestruct(); } catch {}
+  window.close();
 });
 
 // 提供商-模型联动
@@ -698,7 +858,7 @@ $('#btn-save-model').addEventListener('click', async () => {
   try {
     await window.installerAPI.saveModelConfig(provider, apiKey, baseUrl, model, apiProtocol);
     appendLog('模型配置已保存');
-    $$('.config-tab')[1].click();
+    $$('.config-tab')[2].click();
   } catch (err) {
     appendLog('模型配置保存失败: ' + err.message);
     $('#test-api-result').textContent = '保存失败: ' + err.message;
@@ -708,7 +868,7 @@ $('#btn-save-model').addEventListener('click', async () => {
 
 // 返回模型 tab
 $('#btn-back-model').addEventListener('click', () => {
-  $$('.config-tab')[0].click();
+  $$('.config-tab')[1].click();
 });
 
 // ========== 飞书扫码配置 ==========
@@ -826,12 +986,12 @@ $('#btn-save-channel').addEventListener('click', async () => {
     }
   }
 
-  $$('.config-tab')[2].click();
+  $$('.config-tab')[4].click();
 });
 
 // 飞书通道完成 → 跳到完成 tab
 $('#btn-skip-channel').addEventListener('click', () => {
-  $$('.config-tab')[2].click();
+  $$('.config-tab')[4].click();
 });
 
 // 跳过配置（AI模型tab 的"跳过配置"按钮）
@@ -956,4 +1116,169 @@ $('#btn-modal-close').addEventListener('click', hideModal);
 
 $('#modal-overlay').addEventListener('click', (e) => {
   if (e.target === $('#modal-overlay')) hideModal();
+});
+
+// ========== 微信通道扫码流程 ==========
+
+function showWechatScanState(state) {
+  ['wechat-scan-idle', 'wechat-scan-running', 'wechat-scan-success', 'wechat-scan-error'].forEach(id => {
+    const el = $((`#${id}`));
+    if (el) el.classList.add('hidden');
+  });
+  const target = $(`#${state}`);
+  if (target) target.classList.remove('hidden');
+}
+
+function showWechatQRImage(dataUrl) {
+  const container = $('#wechat-qr-container');
+  if (!container) return;
+  container.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = dataUrl;
+  img.style.width = '256px';
+  img.style.height = '256px';
+  img.style.borderRadius = '8px';
+  container.appendChild(img);
+}
+
+let wechatQrcode = null;
+let wechatPollTimer = null;
+
+async function startWechatScan() {
+  showWechatScanState('wechat-scan-running');
+  const statusEl = $('#wechat-scan-status');
+  if (statusEl) statusEl.textContent = '正在安装微信插件...';
+  appendLog('开始微信通道配置...');
+
+  // 阶段1：安装插件
+  try {
+    const installResult = await window.installerAPI.installWeixinPlugin();
+    if (!installResult.success) {
+      showWechatScanState('wechat-scan-error');
+      const errEl = $('#wechat-error-msg');
+      if (errEl) errEl.textContent = '插件安装失败: ' + (installResult.error || '请检查网络');
+      appendLog('微信插件安装失败: ' + (installResult.error || ''));
+      return;
+    }
+    appendLog('微信插件安装成功');
+  } catch (err) {
+    showWechatScanState('wechat-scan-error');
+    const errEl = $('#wechat-error-msg');
+    if (errEl) errEl.textContent = '插件安装异常: ' + err.message;
+    return;
+  }
+
+  // 阶段2：获取 QR 码
+  if (statusEl) statusEl.textContent = '正在生成二维码...';
+  try {
+    const initResult = await window.installerAPI.wechatScanInit();
+    if (!initResult.success) {
+      showWechatScanState('wechat-scan-error');
+      const errEl = $('#wechat-error-msg');
+      if (errEl) errEl.textContent = '二维码生成失败: ' + (initResult.error || '');
+      appendLog('微信 QR 获取失败: ' + (initResult.error || ''));
+      return;
+    }
+
+    wechatQrcode = initResult.qrcode;
+    showWechatQRImage(initResult.qrImage);
+    if (statusEl) statusEl.textContent = '请用微信 App 扫描二维码';
+    appendLog('微信二维码已生成，等待扫码...');
+  } catch (err) {
+    showWechatScanState('wechat-scan-error');
+    const errEl = $('#wechat-error-msg');
+    if (errEl) errEl.textContent = '二维码生成异常: ' + err.message;
+    return;
+  }
+
+  // 阶段3：轮询扫码状态
+  startWechatPoll();
+}
+
+function startWechatPoll() {
+  if (wechatPollTimer) clearInterval(wechatPollTimer);
+  let countdown = 300; // 5分钟
+
+  wechatPollTimer = setInterval(async () => {
+    if (!wechatQrcode) {
+      clearInterval(wechatPollTimer);
+      return;
+    }
+    countdown -= 5;
+    const countdownEl = $('#wechat-countdown');
+    if (countdownEl) countdownEl.textContent = countdown > 0 ? `${Math.floor(countdown / 60)}:${String(countdown % 60).padStart(2, '0')}` : '';
+
+    try {
+      const result = await window.installerAPI.wechatScanPoll(wechatQrcode);
+
+      if (result.status === 'confirmed') {
+        clearInterval(wechatPollTimer);
+        wechatPollTimer = null;
+        showWechatScanState('wechat-scan-success');
+        appendLog('微信通道配置成功！accountId: ' + (result.accountId || ''));
+        return;
+      }
+
+      if (result.status === 'expired') {
+        // QR 过期，需要重新获取
+        clearInterval(wechatPollTimer);
+        appendLog('微信二维码已过期，重新获取...');
+        try {
+          const initResult = await window.installerAPI.wechatScanInit();
+          if (initResult.success) {
+            wechatQrcode = initResult.qrcode;
+            showWechatQRImage(initResult.qrImage);
+            countdown = 300;
+            startWechatPoll();
+          } else {
+            showWechatScanState('wechat-scan-error');
+            const errEl = $('#wechat-error-msg');
+            if (errEl) errEl.textContent = '二维码刷新失败';
+          }
+        } catch {
+          showWechatScanState('wechat-scan-error');
+          const errEl = $('#wechat-error-msg');
+          if (errEl) errEl.textContent = '二维码刷新失败';
+        }
+        return;
+      }
+
+      if (result.status === 'scaned') {
+        const statusEl = $('#wechat-scan-status');
+        if (statusEl) statusEl.textContent = '已扫码，请在微信中确认...';
+      }
+    } catch (err) {
+      appendLog('微信轮询异常: ' + err.message);
+    }
+
+    if (countdown <= 0) {
+      clearInterval(wechatPollTimer);
+      wechatPollTimer = null;
+      showWechatScanState('wechat-scan-error');
+      const errEl = $('#wechat-error-msg');
+      if (errEl) errEl.textContent = '扫码超时，请重试';
+    }
+  }, 5000);
+}
+
+$('#btn-scan-wechat').addEventListener('click', () => {
+  startWechatScan();
+});
+
+$('#btn-retry-wechat-scan').addEventListener('click', () => {
+  startWechatScan();
+});
+
+// Dashboard: 重新配置微信
+$('#btn-reconfig-wechat').addEventListener('click', () => {
+  $$('.config-tab')[3].click(); // 切到微信通道 tab
+});
+
+// 微信 tab 底部导航
+$('#btn-back-feishu').addEventListener('click', () => {
+  $$('.config-tab')[2].click(); // 返回飞书通道
+});
+
+$('#btn-skip-wechat').addEventListener('click', () => {
+  $$('.config-tab')[4].click(); // 跳到完成
 });

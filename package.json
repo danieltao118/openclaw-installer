@@ -1,6 +1,6 @@
 {
   "name": "openclaw-installer",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "description": "OpenClaw 一键安装程序 — 教培AI实战营专用",
   "main": "main.js",
   "license": "MIT",
@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "electron": "^33.4.11",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "sharp": "^0.34.5"
   }
 }

@@ -23,12 +23,12 @@ win:
   icon: build/icon.ico
   requestedExecutionLevel: asInvoker
 portable:
-  artifactName: OpenClaw-Portable.exe
+  artifactName: OpenClaw-Portable-v${version}.exe
 nsis:
   oneClick: true
   perMachine: true
   deleteAppDataOnUninstall: false
-  artifactName: openclaw-setup.exe
+  artifactName: openclaw-setup-v${version}.exe
 
 mac:
   target:

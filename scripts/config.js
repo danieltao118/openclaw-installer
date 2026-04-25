@@ -171,10 +171,8 @@ async function saveModelConfig(provider, apiKey, baseUrl, model, apiProtocol) {
   if (!config.agents.defaults.models) config.agents.defaults.models = {};
   config.agents.defaults.models[`${provider}/${model}`] = {};
 
-  // 确保 gateway auth 模式正确，避免旧配置导致 token mismatch
-  if (!config.gateway) config.gateway = {};
-  if (!config.gateway.auth) config.gateway.auth = {};
-  config.gateway.auth.mode = 'token';
+  // gateway auth 不设置 mode，让 gateway 通过 --token 参数自行管理
+  // 避免 openclaw.json 中的 auth 配置与 gateway-token 文件不匹配
 
   writeConfig(config);
 
@@ -355,6 +353,7 @@ function getConfigStatus() {
 
   let hasApiKey = false;
   let hasFeishu = false;
+  let hasWeixin = false;
 
   if (fs.existsSync(envFile)) {
     const envContent = fs.readFileSync(envFile, 'utf8');
@@ -365,10 +364,26 @@ function getConfigStatus() {
     hasFeishu = true;
   }
 
+  if (config.plugins?.entries?.['openclaw-weixin']?.enabled) {
+    // 插件启用了，还要检查是否有真实的账号凭证（扫码登录后才有）
+    const weixinStateDir = path.join(OPENCLAW_DIR, 'state', 'openclaw-weixin', 'accounts');
+    const weixinLegacyDir = path.join(OPENCLAW_DIR, 'credentials', 'openclaw-weixin');
+    try {
+      if (fs.existsSync(weixinStateDir)) {
+        const accounts = fs.readdirSync(weixinStateDir).filter(f => f.endsWith('.json') && f !== 'accounts.json');
+        if (accounts.length > 0) hasWeixin = true;
+      }
+      if (!hasWeixin && fs.existsSync(path.join(weixinLegacyDir, 'credentials.json'))) {
+        hasWeixin = true;
+      }
+    } catch {}
+  }
+
   return {
     hasConfig: fs.existsSync(CONFIG_FILE),
     hasApiKey,
     hasFeishu,
+    hasWeixin,
     model: config.agents?.defaults?.model?.primary || '未设置',
   };
 }

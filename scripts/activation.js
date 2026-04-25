@@ -88,25 +88,26 @@ function validateCode(code) {
   }
 
   const [, type, rand1, rand2, providedCheck1, providedCheck2] = match;
+  const upperType = type.toUpperCase();
   const upperCheck1 = providedCheck1.toUpperCase();
   const upperCheck2 = providedCheck2.toUpperCase();
 
   // 双层校验验证
-  const expectedCheck1 = computeCheck1(type, rand1, rand2);
+  const expectedCheck1 = computeCheck1(upperType, rand1, rand2);
   if (upperCheck1 !== expectedCheck1) {
     return { valid: false, reason: '激活码无效' };
   }
 
-  const expectedCheck2 = computeCheck2(type, rand1, rand2, upperCheck1);
+  const expectedCheck2 = computeCheck2(upperType, rand1, rand2, upperCheck1);
   if (upperCheck2 !== expectedCheck2) {
     return { valid: false, reason: '激活码无效' };
   }
 
   return {
     valid: true,
-    type,
-    typeName: CODE_TYPES[type].name,
-    days: CODE_TYPES[type].days,
+    type: upperType,
+    typeName: CODE_TYPES[upperType].name,
+    days: CODE_TYPES[upperType].days,
   };
 }
 

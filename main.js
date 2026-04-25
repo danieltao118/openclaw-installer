@@ -32,8 +32,9 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 820,
     height: 720,
-    resizable: false,
-    maximizable: false,
+    minWidth: 640,
+    minHeight: 540,
+    resizable: true,
     title: 'OpenClaw 安装向导',
     icon: path.join(__dirname, 'build', 'icon.png'),
     webPreferences: {
@@ -106,15 +107,19 @@ function getCmd(name) {
   return process.platform === 'win32' ? name + '.cmd' : name;
 }
 
-// Windows 上隐藏窗口启动命令
+// Windows 上彻底隐藏窗口启动命令
 function spawnHidden(command, args, options) {
   const isWin = process.platform === 'win32';
   if (isWin) {
-    // 用 cmd /c 调用 .cmd 文件，通过 windowsHide 隐藏窗口
-    return childSpawn('cmd', ['/c', command, ...args], {
+    // 用 PowerShell -WindowStyle Hidden 彻底隐藏所有子进程窗口
+    const fullCmd = `"${command}" ${args.join(' ')}`;
+    return childSpawn('powershell.exe', [
+      '-WindowStyle', 'Hidden',
+      '-NonInteractive',
+      '-Command', fullCmd,
+    ], {
       ...options,
       shell: false,
-      windowsHide: true,
       stdio: 'ignore',
       detached: true,
     });
@@ -237,6 +242,68 @@ ipcMain.handle('get-config-status', async (event) => {
   return config.getConfigStatus();
 });
 
+// Gateway 控制面板 IPC
+ipcMain.handle('gateway-status', async () => {
+  const config = require('./scripts/config');
+  const status = config.getConfigStatus();
+  const running = await checkGatewayHealth();
+  return { running, model: status.model, hasApiKey: status.hasApiKey, hasFeishu: status.hasFeishu, hasWeixin: status.hasWeixin };
+});
+
+ipcMain.handle('gateway-stop', async () => {
+  const { execSync } = require('child_process');
+  const cmd = getCmd('openclaw');
+  try {
+    execSync(`"${cmd}" gateway stop`, { timeout: 10000, stdio: 'pipe', windowsHide: true });
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('gateway-restart', async () => {
+  const logger = require('./scripts/logger');
+  const { execSync } = require('child_process');
+  const cmd = getCmd('openclaw');
+  // 停止旧 gateway
+  try {
+    execSync(`"${cmd}" gateway stop`, { timeout: 10000, stdio: 'pipe', windowsHide: true });
+    logger.info('重启：已停止旧 gateway');
+  } catch {}
+  // 轮询确认旧进程退出（最多 10 秒）
+  for (let i = 0; i < 20; i++) {
+    if (!(await checkGatewayHealth())) break;
+    await new Promise(r => setTimeout(r, 500));
+  }
+  // 如果还活着，强制杀
+  if (await checkGatewayHealth()) {
+    try {
+      if (process.platform === 'win32') {
+        const out = execSync('netstat -ano | findstr :18789 | findstr LISTENING', { encoding: 'utf8', timeout: 3000, windowsHide: true });
+        const pid = out.trim().split(/\s+/).pop();
+        if (pid && /^\d+$/.test(pid)) {
+          execSync(`powershell -Command "Start-Process powershell -ArgumentList '-Command','Stop-Process -Id ${pid} -Force' -Verb RunAs -Wait"`, { timeout: 10000, windowsHide: true });
+          logger.info(`强制杀掉旧 gateway PID: ${pid}`);
+        }
+      }
+    } catch {}
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  // 复用 launch-openclaw 的完整逻辑
+  return ipcMain.invoke('launch-openclaw');
+});
+
+ipcMain.handle('get-dashboard-url', async () => {
+  // token 已在 launch-openclaw 中写入 openclaw.json，直接读取
+  try {
+    const cfg = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.openclaw', 'openclaw.json'), 'utf8'));
+    if (cfg.gateway?.auth?.token) {
+      return `http://127.0.0.1:18789/#token=${encodeURIComponent(cfg.gateway.auth.token)}`;
+    }
+  } catch {}
+  return 'http://127.0.0.1:18789';
+});
+
 ipcMain.handle('open-log-file', async (event) => {
   const { shell } = require('electron');
   const logger = require('./scripts/logger');
@@ -348,16 +415,51 @@ ipcMain.handle('launch-openclaw', async (event) => {
   const { shell } = require('electron');
   const crypto = require('crypto');
   const logger = require('./scripts/logger');
+  const config = require('./scripts/config');
+  const openclawJsonPath = path.join(os.homedir(), '.openclaw', 'openclaw.json');
+
+  // 从 openclaw.json 读取 token
+  const getGatewayToken = () => {
+    try {
+      const cfg = JSON.parse(fs.readFileSync(openclawJsonPath, 'utf8'));
+      return cfg.gateway?.auth?.token || null;
+    } catch { return null; }
+  };
+
+  // 生成或复用 token
+  let token = getGatewayToken();
+  if (!token) {
+    token = crypto.randomBytes(16).toString('hex');
+    logger.info(`生成新 gateway token: ${token.substring(0, 8)}...`);
+  } else {
+    logger.info(`复用已有 gateway token: ${token.substring(0, 8)}...`);
+  }
+
+  // 将 token 写入 openclaw.json（gateway 从配置文件读取，不依赖 --token 参数）
+  const cfg = config.readConfig();
+  if (!cfg.gateway) cfg.gateway = {};
+  if (!cfg.gateway.auth) cfg.gateway.auth = {};
+  cfg.gateway.auth.token = token;
+  config.writeConfig(cfg);
+  logger.info(`Token 已写入 openclaw.json: ${token.substring(0, 8)}...`);
+
+  // 打开 Dashboard
+  const openDashboard = async (port) => {
+    const actualToken = getGatewayToken() || token;
+    const dashboardUrl = `http://127.0.0.1:${port}/#token=${encodeURIComponent(actualToken)}`;
+    logger.info(`打开 Dashboard: ${dashboardUrl.substring(0, 60)}...`);
+    await shell.openExternal(dashboardUrl);
+  };
+
   try {
     const cmd = getCmd('openclaw');
+    const DEFAULT_PORT = 18789;
+    let gatewayPort = DEFAULT_PORT;
 
-    // 注册为系统服务（开机自启动）
+    // 注册为系统服务（开机自启动）— 静默失败
     try {
-      execSync(`"${cmd}" gateway install`, { timeout: 10000, stdio: 'pipe' });
-      logger.info('Gateway 系统服务已注册（开机自启动）');
-    } catch (err) {
-      logger.info('Gateway 服务注册跳过: ' + (err.message || ''));
-    }
+      execSync(`"${cmd}" gateway install`, { timeout: 10000, stdio: 'pipe', windowsHide: true });
+    } catch {}
 
     // macOS: 确保 npm 全局路径在 PATH 中
     if (process.platform !== 'win32') {
@@ -370,94 +472,80 @@ ipcMain.handle('launch-openclaw', async (event) => {
       } catch {}
     }
 
-    // Token 复用：从文件读取，没有则生成新的
-    const tokenPath = path.join(os.homedir(), '.openclaw', 'gateway-token');
-    let token;
-    try {
-      token = fs.readFileSync(tokenPath, 'utf8').trim();
-      logger.info(`复用已有 token: ${token.substring(0, 8)}...`);
-    } catch {
-      token = crypto.randomBytes(16).toString('hex');
-      fs.mkdirSync(path.dirname(tokenPath), { recursive: true });
-      fs.writeFileSync(tokenPath, token, 'utf8');
-      logger.info(`生成新 token: ${token.substring(0, 8)}...`);
+    // 先检查是否已在运行
+    if (await checkGatewayHealth()) {
+      logger.info('Gateway 已在运行，直接打开 Dashboard');
+      await openDashboard(DEFAULT_PORT);
+      return { success: true };
     }
 
-    // 先停掉旧 gateway，避免 token 冲突和配置残留
+    // 停掉旧 gateway（仅当需要重启时）
     try {
-      execSync(`"${cmd}" gateway stop`, { timeout: 5000, stdio: 'pipe' });
-      logger.info('已停掉旧 gateway');
-      // 等待旧进程完全退出，避免竞态
-      await new Promise(r => setTimeout(r, 5000));
+      execSync(`"${cmd}" gateway stop`, { timeout: 5000, stdio: 'pipe', windowsHide: true });
+      for (let i = 0; i < 10; i++) {
+        if (!(await checkGatewayHealth())) break;
+        await new Promise(r => setTimeout(r, 500));
+      }
     } catch {}
 
-    // 等待后再检查（此时旧进程应该已退出）
-    const DEFAULT_PORT = 18789;
-    let gatewayPort = DEFAULT_PORT;
-    const alreadyRunning = await checkGatewayHealth();
-    if (alreadyRunning) {
-      logger.info('Gateway 已在运行，直接打开 Dashboard');
+    // 再次确认端口可用
+    let portInUse = false;
+    if (process.platform === 'win32') {
+      try {
+        const out = execSync('netstat -ano | findstr :18789 | findstr LISTENING', { encoding: 'utf8', timeout: 3000, windowsHide: true });
+        if (out.trim()) portInUse = true;
+      } catch {}
     } else {
-      // 检查默认端口是否被其他程序占用
-      let portInUse = false;
-      if (process.platform === 'win32') {
-        try {
-          const out = execSync('netstat -ano | findstr :18789 | findstr LISTENING', { encoding: 'utf8', timeout: 5000 });
-          if (out.trim()) portInUse = true;
-        } catch {}
-      } else {
-        try {
-          const out = execSync('lsof -ti:18789', { encoding: 'utf8', timeout: 5000 }).trim();
-          if (out) portInUse = true;
-        } catch {}
-      }
+      try {
+        const out = execSync('lsof -ti:18789', { encoding: 'utf8', timeout: 3000, windowsHide: true }).trim();
+        if (out) portInUse = true;
+      } catch {}
+    }
 
-      if (portInUse) {
-        // 端口被其他程序占用，尝试用 --force 强制接管（会杀掉自己的旧 gateway）
-        // 如果 --force 失败，则自动换端口
-        logger.info('端口 18789 被占用，尝试 --force 接管');
-        try {
-          const child = spawnHidden(cmd, ['gateway', 'run', '--allow-unconfigured', '--token', token, '--force'], {
-            env: { ...process.env },
-          });
-          child.on('error', () => {});
-          child.unref();
-          const ready = await waitForGateway(20, 2000);
-          if (!ready) throw new Error('force failed');
-        } catch {
-          // force 失败，换端口
-          gatewayPort = 18790;
-          logger.info('换到端口 18790');
-          const child = spawnHidden(cmd, ['gateway', 'run', '--allow-unconfigured', '--token', token, '--port', '18790'], {
-            env: { ...process.env },
-          });
-          child.on('error', (err) => { logger.error(`启动 OpenClaw 失败: ${err.message}`); });
-          child.unref();
-          const ready = await waitForGateway(20, 2000, 18790);
-          if (!ready) {
-            return { success: false, error: 'Gateway 启动超时，请检查端口是否被占用' };
-          }
-        }
-      } else {
-        // 端口空闲，正常启动
-        const child = spawnHidden(cmd, ['gateway', 'run', '--allow-unconfigured', '--token', token], {
+    if (portInUse) {
+      logger.info('端口 18789 被占用，尝试 --force 接管');
+      try {
+        const child = spawnHidden(cmd, ['gateway', 'run', '--allow-unconfigured', '--force'], {
+          env: { ...process.env },
+        });
+        child.on('error', () => {});
+        child.unref();
+        if (!(await waitForGateway(10, 1000))) throw new Error('force failed');
+      } catch {
+        gatewayPort = 18790;
+        const child = spawnHidden(cmd, ['gateway', 'run', '--allow-unconfigured', '--port', '18790'], {
           env: { ...process.env },
         });
         child.on('error', (err) => { logger.error(`启动 OpenClaw 失败: ${err.message}`); });
         child.unref();
-        logger.info(`Gateway 进程已启动 PID: ${child.pid}`);
-        const ready = await waitForGateway(30, 2000);
-        if (!ready) {
-          return { success: false, error: 'Gateway 启动超时（60秒），请稍后重试' };
+        if (!(await waitForGateway(10, 1000, 18790))) {
+          return { success: false, error: 'Gateway 启动超时，请检查端口是否被占用' };
         }
+      }
+    } else {
+      // 正常启动（不传 --token，gateway 从 openclaw.json 读取）
+      const child = spawnHidden(cmd, ['gateway', 'run', '--allow-unconfigured'], {
+        env: { ...process.env },
+      });
+      child.on('error', (err) => { logger.error(`启动 OpenClaw 失败: ${err.message}`); });
+      child.unref();
+      logger.info(`Gateway 进程已启动 PID: ${child.pid}`);
+
+      // 快速轮询：前 10 次 500ms，之后 2s
+      let ready = false;
+      for (let i = 0; i < 10; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        if (await checkGatewayHealth()) { ready = true; break; }
+      }
+      if (!ready) {
+        ready = await waitForGateway(20, 2000);
+      }
+      if (!ready) {
+        return { success: false, error: 'Gateway 启动超时，请稍后重试' };
       }
     }
 
-    // 打开带 token 的 Dashboard
-    const dashboardUrl = `http://127.0.0.1:${gatewayPort}/#token=${encodeURIComponent(token)}`;
-    logger.info(`打开 Dashboard: ${dashboardUrl.substring(0, 50)}...`);
-    await shell.openExternal(dashboardUrl);
-
+    await openDashboard(gatewayPort);
     return { success: true };
   } catch (err) {
     logger.error(`启动 OpenClaw 失败: ${err.message}`);
@@ -522,6 +610,67 @@ ipcMain.handle('feishu-scan-poll', async (event, deviceCode, interval, expireIn)
     return result;
   } catch (err) {
     logger.error(`飞书扫码轮询失败: ${err.message}`);
+    return { status: 'error', message: err.message };
+  }
+});
+
+// 微信扫码登录 IPC
+ipcMain.handle('wechat-plugin-install', async () => {
+  const logger = require('./scripts/logger');
+  try {
+    const wechat = require('./scripts/wechat-scan');
+    await wechat.installWeixinPlugin();
+    logger.info('微信插件安装完成');
+    return { success: true };
+  } catch (err) {
+    logger.error(`微信插件安装失败: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('wechat-scan-init', async () => {
+  const logger = require('./scripts/logger');
+  try {
+    const wechat = require('./scripts/wechat-scan');
+    const QR = require('qrcode');
+    const resp = await wechat.fetchQRCode();
+    logger.info(`微信 QR 获取成功, content 长度: ${resp.qrcode_img_content?.length || 0}`);
+
+    // 将 QR URL 转为 base64 图片
+    const qrDataUrl = await QR.toDataURL(resp.qrcode_img_content, { width: 256, margin: 2 });
+    return { success: true, qrImage: qrDataUrl, qrcode: resp.qrcode };
+  } catch (err) {
+    logger.error(`微信 QR 获取失败: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('wechat-scan-poll', async (event, qrcode) => {
+  const logger = require('./scripts/logger');
+  try {
+    const wechat = require('./scripts/wechat-scan');
+    const statusResp = await wechat.pollQRStatus(qrcode);
+    logger.info(`微信扫码状态: ${statusResp.status}`);
+
+    if (statusResp.status === 'confirmed' && statusResp.bot_token && statusResp.ilink_bot_id) {
+      // 保存凭证
+      wechat.saveWeixinAccount(
+        statusResp.ilink_bot_id,
+        statusResp.bot_token,
+        statusResp.baseurl,
+        statusResp.ilink_user_id,
+      );
+      return { status: 'confirmed', accountId: statusResp.ilink_bot_id };
+    }
+
+    // 过期时需要刷新 QR
+    if (statusResp.status === 'expired') {
+      return { status: 'expired' };
+    }
+
+    return { status: statusResp.status };
+  } catch (err) {
+    logger.error(`微信扫码轮询失败: ${err.message}`);
     return { status: 'error', message: err.message };
   }
 });

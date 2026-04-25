@@ -1010,7 +1010,6 @@ body {
   font-family: var(--mono);
   font-size: 16px;
   letter-spacing: 1px;
-  text-transform: uppercase;
   padding: 10px 14px;
 }
 
@@ -1191,4 +1190,73 @@ body {
   font-size: 12px;
   color: var(--text-dim);
   margin-top: 2px;
+}
+
+/* ========== 控制面板 ========== */
+.dashboard-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.dashboard-card h3 {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 8px 0;
+  font-weight: 600;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot.online {
+  background: #4ade80;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.6);
+}
+
+.status-dot.offline {
+  background: #6b7280;
+}
+
+.status-dot.checking {
+  background: #facc15;
+  animation: status-pulse 1s infinite;
+}
+
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.dashboard-info {
+  color: var(--text-dim);
+  font-size: 0.85em;
+  margin: 8px 0 12px;
+  min-height: 20px;
+}
+
+.dashboard-model {
+  font-size: 1em;
+  color: var(--text);
+  margin: 0 0 8px;
+  font-family: 'Courier New', monospace;
+}
+
+.dashboard-actions {
+  margin-top: 20px;
 }
