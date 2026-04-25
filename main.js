@@ -284,7 +284,7 @@ ipcMain.handle('gateway-restart', async () => {
         const out = execSync('netstat -ano | findstr :18789 | findstr LISTENING', { encoding: 'utf8', timeout: 3000, windowsHide: true });
         const pid = out.trim().split(/\s+/).pop();
         if (pid && /^\d+$/.test(pid)) {
-          execSync(`powershell -Command "Start-Process powershell -ArgumentList '-Command','Stop-Process -Id ${pid} -Force' -Verb RunAs -Wait"`, { timeout: 10000, windowsHide: true });
+          execSync(`taskkill /F /PID ${pid}`, { timeout: 5000, windowsHide: true });
           logger.info(`强制杀掉旧 gateway PID: ${pid}`);
         }
       }
