@@ -111,19 +111,14 @@ function getCmd(name) {
 function spawnHidden(command, args, options) {
   const isWin = process.platform === 'win32';
   if (isWin) {
-    // PowerShell -WindowStyle Hidden 隐藏窗口
-    // 用 & 调用运算符避免引号路径解析问题
-    const escapedCmd = command.replace(/'/g, "''");
-    const escapedArgs = args.map(a => `'${a.replace(/'/g, "''")}'`).join(' ');
-    return childSpawn('powershell.exe', [
-      '-WindowStyle', 'Hidden',
-      '-NonInteractive',
-      '-Command', `& '${escapedCmd}' ${escapedArgs}`,
-    ], {
+    // Windows: shell: true + windowsHide: true 隐藏窗口
+    // 子进程与父进程同权限，可以被 taskkill 杀掉
+    return childSpawn(command, args, {
       ...options,
-      shell: false,
+      shell: true,
       stdio: 'ignore',
       detached: true,
+      windowsHide: true,
     });
   }
   return childSpawn(command, args, {
@@ -254,13 +249,45 @@ ipcMain.handle('gateway-status', async () => {
 
 ipcMain.handle('gateway-stop', async () => {
   const { execSync } = require('child_process');
+  const logger = require('./scripts/logger');
   const cmd = getCmd('openclaw');
+  // 先尝试 openclaw 自带的 stop
   try {
     execSync(`"${cmd}" gateway stop`, { timeout: 10000, stdio: 'pipe', windowsHide: true });
-    return { success: true };
-  } catch (err) {
-    return { success: false, error: err.message };
+  } catch {}
+  // 等一下看是否停了
+  for (let i = 0; i < 6; i++) {
+    if (!(await checkGatewayHealth())) return { success: true };
+    await new Promise(r => setTimeout(r, 500));
   }
+  // 还没停，用 taskkill 强制杀端口对应的进程
+  if (process.platform === 'win32') {
+    try {
+      const out = execSync('netstat -ano | findstr :18789 | findstr LISTENING', { encoding: 'utf8', timeout: 3000, windowsHide: true });
+      const pids = new Set();
+      out.trim().split('\n').forEach(line => {
+        const parts = line.trim().split(/\s+/);
+        const pid = parts[parts.length - 1];
+        if (pid && /^\d+$/.test(pid)) pids.add(pid);
+      });
+      for (const pid of pids) {
+        try {
+          execSync(`taskkill /F /PID ${pid}`, { timeout: 5000, windowsHide: true });
+          logger.info(`强制杀掉 gateway PID: ${pid}`);
+        } catch {}
+      }
+    } catch {}
+  } else {
+    try {
+      execSync('pkill -f "openclaw gateway" 2>/dev/null || true', { timeout: 5000 });
+    } catch {}
+  }
+  // 最终确认
+  for (let i = 0; i < 6; i++) {
+    if (!(await checkGatewayHealth())) return { success: true };
+    await new Promise(r => setTimeout(r, 500));
+  }
+  return { success: false, error: '无法停止 Gateway，请手动关闭' };
 });
 
 ipcMain.handle('gateway-restart', async () => {
@@ -484,9 +511,26 @@ ipcMain.handle('launch-openclaw', async (event) => {
         if (!(await checkGatewayHealth())) break;
         await new Promise(r => setTimeout(r, 500));
       }
+      // 如果还没停掉，用 taskkill 强杀
+      if (await checkGatewayHealth() && process.platform === 'win32') {
+        const out = execSync('netstat -ano | findstr :18789 | findstr LISTENING', { encoding: 'utf8', timeout: 3000, windowsHide: true });
+        const pids = new Set();
+        out.trim().split('\n').forEach(line => {
+          const parts = line.trim().split(/\s+/);
+          const pid = parts[parts.length - 1];
+          if (pid && /^\d+$/.test(pid)) pids.add(pid);
+        });
+        for (const pid of pids) {
+          try {
+            execSync(`taskkill /F /PID ${pid}`, { timeout: 5000, windowsHide: true });
+            logger.info(`强制杀掉 gateway PID: ${pid}`);
+          } catch {}
+        }
+        await new Promise(r => setTimeout(r, 1000));
+      }
     } catch {}
 
-    // 再次确认端口可用
+    // 检测端口可用性 — 如果 18789 被其他进程占用（如 AutoClaw），自动换端口
     let portInUse = false;
     if (process.platform === 'win32') {
       try {
@@ -501,24 +545,25 @@ ipcMain.handle('launch-openclaw', async (event) => {
     }
 
     if (portInUse) {
-      logger.info('端口 18789 被占用，尝试 --force 接管');
-      try {
-        const child = spawnHidden(cmd, ['gateway', 'run', '--allow-unconfigured', '--force'], {
-          env: { ...process.env },
-        });
-        child.on('error', () => {});
-        child.unref();
-        if (!(await waitForGateway(10, 1000))) throw new Error('force failed');
-      } catch {
-        gatewayPort = 18790;
-        const child = spawnHidden(cmd, ['gateway', 'run', '--allow-unconfigured', '--port', '18790'], {
-          env: { ...process.env },
-        });
-        child.on('error', (err) => { logger.error(`启动 OpenClaw 失败: ${err.message}`); });
-        child.unref();
-        if (!(await waitForGateway(10, 1000, 18790))) {
-          return { success: false, error: 'Gateway 启动超时，请检查端口是否被占用' };
-        }
+      // 端口被占用（可能是 AutoClaw 或其他 gateway），直接用 18790
+      gatewayPort = 18790;
+      logger.info(`端口 18789 被占用，使用 ${gatewayPort}`);
+      const child = spawnHidden(cmd, ['gateway', 'run', '--allow-unconfigured', '--port', String(gatewayPort)], {
+        env: { ...process.env },
+      });
+      child.on('error', (err) => { logger.error(`启动 OpenClaw 失败: ${err.message}`); });
+      child.unref();
+      logger.info(`Gateway 进程已启动 PID: ${child.pid} 端口: ${gatewayPort}`);
+
+      let ready = false;
+      for (let i = 0; i < 15; i++) {
+        await new Promise(r => setTimeout(r, 1000));
+        const h = await checkGatewayHealth(gatewayPort);
+        logger.info(`Health check ${i+1}/15 (port ${gatewayPort}): ${h}`);
+        if (h) { ready = true; break; }
+      }
+      if (!ready) {
+        return { success: false, error: 'Gateway 启动超时，请检查端口是否被占用' };
       }
     } else {
       // 正常启动（不传 --token，gateway 从 openclaw.json 读取）
