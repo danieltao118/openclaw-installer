@@ -224,7 +224,7 @@ async function saveChannelConfig(appId, appSecret) {
     const cmd = getCmd('openclaw');
     // openclaw channels add 命令格式可能不同版本有差异
     // 直接写入配置文件已足够，CLI 调用仅作为补充
-    execSync(`"${cmd}" configure --section channels --yes`, {
+    execSync(`"${cmd}" configure --section channels`, {
       timeout: 15000,
       encoding: 'utf8',
       stdio: 'pipe',
