@@ -474,16 +474,12 @@ ipcMain.handle('launch-openclaw', async (event) => {
       } catch {}
     }
 
-    // 先检查是否已在运行
-    if (await checkGatewayHealth()) {
-      logger.info('Gateway 已在运行，直接打开 Dashboard');
-      await openDashboard(DEFAULT_PORT);
-      return { success: true };
-    }
-
-    // 停掉旧 gateway（仅当需要重启时）
+    // 停掉旧 gateway — 确保重启后 token 跟 openclaw.json 一致
     try {
-      execSync(`"${cmd}" gateway stop`, { timeout: 5000, stdio: 'pipe', windowsHide: true });
+      if (await checkGatewayHealth()) {
+        logger.info('Gateway 已在运行，停止后重新启动以确保 token 一致');
+      }
+      execSync(`"${cmd}" gateway stop`, { timeout: 10000, stdio: 'pipe', windowsHide: true });
       for (let i = 0; i < 10; i++) {
         if (!(await checkGatewayHealth())) break;
         await new Promise(r => setTimeout(r, 500));
@@ -537,10 +533,13 @@ ipcMain.handle('launch-openclaw', async (event) => {
       let ready = false;
       for (let i = 0; i < 10; i++) {
         await new Promise(r => setTimeout(r, 500));
-        if (await checkGatewayHealth()) { ready = true; break; }
+        const h = await checkGatewayHealth();
+        logger.info(`Health check ${i+1}/10: ${h}`);
+        if (h) { ready = true; break; }
       }
       if (!ready) {
-        ready = await waitForGateway(20, 2000);
+        logger.info('进入慢速轮询...');
+        ready = await waitForGateway(30, 2000);
       }
       if (!ready) {
         return { success: false, error: 'Gateway 启动超时，请稍后重试' };
