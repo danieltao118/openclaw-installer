@@ -664,6 +664,7 @@ $('#btn-gw-restart').addEventListener('click', async () => {
     const result = await window.installerAPI.gatewayRestart();
     if (result.success) {
       appendLog('Gateway 已重启');
+      await new Promise(r => setTimeout(r, 2000));
     } else {
       appendLog('Gateway 重启失败: ' + (result.error || '未知错误'));
     }

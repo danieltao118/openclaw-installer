@@ -296,42 +296,8 @@ ipcMain.handle('gateway-stop', async () => {
 
 ipcMain.handle('gateway-restart', async () => {
   const logger = require('./scripts/logger');
-  const { execSync } = require('child_process');
-  const cmd = getCmd('openclaw');
-  // 停止旧 gateway
-  try {
-    execSync(`"${cmd}" gateway stop`, { timeout: 10000, stdio: 'pipe', windowsHide: true });
-    logger.info('重启：已停止旧 gateway');
-  } catch {}
-  // 轮询确认旧进程退出（最多 10 秒）
-  const restartCfg = require('./scripts/config').readConfig();
-  const restartPort = restartCfg.gateway?.port || 18789;
-  for (let i = 0; i < 20; i++) {
-    if (!(await checkGatewayHealth(restartPort))) break;
-    await new Promise(r => setTimeout(r, 500));
-  }
-  // 如果还活着，强制杀
-  if (await checkGatewayHealth(restartPort)) {
-    try {
-      if (process.platform === 'win32') {
-        const out = execSync(`netstat -ano | findstr :${restartPort} | findstr LISTENING`, { encoding: 'utf8', timeout: 3000, windowsHide: true });
-        const pids = new Set();
-        out.trim().split('\n').forEach(line => {
-          const parts = line.trim().split(/\s+/);
-          const pid = parts[parts.length - 1];
-          if (pid && /^\d+$/.test(pid)) pids.add(pid);
-        });
-        for (const pid of pids) {
-          try {
-            execSync(`taskkill /F /PID ${pid}`, { timeout: 5000, windowsHide: true });
-            logger.info(`强制杀掉旧 gateway PID: ${pid}`);
-          } catch {}
-        }
-      }
-    } catch {}
-    await new Promise(r => setTimeout(r, 2000));
-  }
-  // 直接调用启动函数
+  logger.info('收到重启请求');
+  // doLaunchOpenclaw() 内部已包含完整的停→启流程，无需重复停止
   return await doLaunchOpenclaw();
 });
 
