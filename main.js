@@ -331,8 +331,8 @@ ipcMain.handle('gateway-restart', async () => {
     } catch {}
     await new Promise(r => setTimeout(r, 2000));
   }
-  // 复用 launch-openclaw 的完整逻辑
-  return ipcMain.invoke('launch-openclaw');
+  // 直接调用启动函数
+  return await doLaunchOpenclaw();
 });
 
 ipcMain.handle('get-dashboard-url', async () => {
@@ -454,7 +454,7 @@ ipcMain.handle('self-destruct', async () => {
   }
 });
 
-ipcMain.handle('launch-openclaw', async (event) => {
+async function doLaunchOpenclaw() {
   const { spawn, execSync } = require('child_process');
   const { shell } = require('electron');
   const crypto = require('crypto');
@@ -630,6 +630,10 @@ ipcMain.handle('launch-openclaw', async (event) => {
     logger.error(`启动 OpenClaw 失败: ${err.message}`);
     return { success: false, error: err.message };
   }
+}
+
+ipcMain.handle('launch-openclaw', async () => {
+  return await doLaunchOpenclaw();
 });
 
 // 检查 gateway 是否已在运行
