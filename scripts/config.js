@@ -218,21 +218,7 @@ async function saveChannelConfig(appId, appSecret) {
   };
 
   writeConfig(config);
-
-  // CLI 同步为可选操作
-  try {
-    const cmd = getCmd('openclaw');
-    // openclaw channels add 命令格式可能不同版本有差异
-    // 直接写入配置文件已足够，CLI 调用仅作为补充
-    execSync(`"${cmd}" configure --section channels`, {
-      timeout: 15000,
-      encoding: 'utf8',
-      stdio: 'pipe',
-    });
-    logger.info('已通过 CLI 同步通道配置');
-  } catch (err) {
-    logger.info('CLI 通道同步跳过（配置已通过文件写入）');
-  }
+  logger.info('飞书通道配置已写入 openclaw.json');
 
   return { success: true };
 }

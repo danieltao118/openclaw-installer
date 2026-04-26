@@ -470,6 +470,16 @@ async function doLaunchOpenclaw() {
     const DEFAULT_PORT = 18789;
     let gatewayPort = DEFAULT_PORT;
 
+    // 清理 feishu 扩展的 install-stage 残留文件（防止 EPERM 导致 gateway 反复重启）
+    try {
+      const extDir = path.dirname(cmd);
+      const feishuStage = path.join(extDir, '..', 'node_modules', 'openclaw', 'dist', 'extensions', 'feishu', '.openclaw-install-stage');
+      if (fs.existsSync(feishuStage)) {
+        fs.unlinkSync(feishuStage);
+        logger.info('已清理 feishu .openclaw-install-stage 残留文件');
+      }
+    } catch {}
+
     // 注册为系统服务（开机自启动）— 静默失败
     try {
       execSync(`"${cmd}" gateway install`, { timeout: 10000, stdio: 'pipe', windowsHide: true });

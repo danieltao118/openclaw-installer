@@ -959,13 +959,22 @@ $('#btn-save-channel').addEventListener('click', async () => {
   const appId = $('#cfg-feishu-appid').value.trim();
   const appSecret = $('#cfg-feishu-secret').value.trim();
 
-  if (appId && appSecret) {
-    try {
-      await window.installerAPI.saveChannelConfig(appId, appSecret);
-      appendLog('飞书通道配置已保存');
-    } catch (err) {
-      appendLog('飞书配置保存失败: ' + err.message);
-    }
+  if (!appId || !appSecret) {
+    appendLog('请填写飞书 App ID 和 App Secret');
+    return;
+  }
+
+  const btn = $('#btn-save-channel');
+  btn.disabled = true;
+  btn.textContent = '保存中...';
+  try {
+    await window.installerAPI.saveChannelConfig(appId, appSecret);
+    appendLog('飞书通道配置已保存，Gateway 将自动重启生效');
+  } catch (err) {
+    appendLog('飞书配置保存失败: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '保存并完成 →';
   }
 
   $$('.config-tab')[4].click();
