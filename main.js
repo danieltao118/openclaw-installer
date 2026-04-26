@@ -107,16 +107,16 @@ function getCmd(name) {
   return process.platform === 'win32' ? name + '.cmd' : name;
 }
 
-// Windows 上彻底隐藏窗口启动命令（PowerShell -WindowStyle Hidden）
+// Windows 上彻底隐藏窗口启动命令
+// PowerShell 负责隐藏窗口，cmd /c 负责执行命令（兼容 .cmd 文件和管道语法）
 function spawnHidden(command, args, options) {
   const isWin = process.platform === 'win32';
   if (isWin) {
-    const escapedCmd = command.replace(/'/g, "''");
-    const escapedArgs = args.map(a => `'${a.replace(/'/g, "''")}'`).join(' ');
+    const argStr = args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ');
     return childSpawn('powershell.exe', [
       '-WindowStyle', 'Hidden',
       '-NonInteractive',
-      '-Command', `& '${escapedCmd}' ${escapedArgs}`,
+      '-Command', `cmd /c '${command} ${argStr}'`,
     ], {
       ...options,
       shell: false,
@@ -132,16 +132,15 @@ function spawnHidden(command, args, options) {
   });
 }
 
-// execSync 的隐藏版本 — 用 PowerShell 执行避免 CMD 窗口闪现
+// execSync 的隐藏版本 — PowerShell 隐藏窗口 + cmd /c 执行命令
 async function execHidden(command, timeout = 10000) {
   return new Promise((resolve) => {
     const isWin = process.platform === 'win32';
     let child;
     if (isWin) {
-      const escaped = command.replace(/'/g, "''");
       child = childSpawn('powershell.exe', [
         '-WindowStyle', 'Hidden', '-NonInteractive',
-        '-Command', escaped,
+        '-Command', `cmd /c '${command}'`,
       ], { stdio: ['ignore', 'pipe', 'pipe'] });
     } else {
       child = childSpawn('/bin/sh', ['-c', command], { stdio: ['ignore', 'pipe', 'pipe'] });
