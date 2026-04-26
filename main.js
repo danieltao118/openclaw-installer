@@ -107,17 +107,12 @@ function getCmd(name) {
   return process.platform === 'win32' ? name + '.cmd' : name;
 }
 
-// Windows 上彻底隐藏窗口启动命令
-// 关键：shell:true 让进程链保持存活，PowerShell -WindowStyle Hidden 隐藏窗口
+// Windows 上隐藏窗口启动命令
+// shell:true 保持进程链存活，windowsHide 尽量隐藏窗口（仍有短暂闪现）
 function spawnHidden(command, args, options) {
   const isWin = process.platform === 'win32';
   if (isWin) {
-    const argStr = args.map(a => a.includes(' ') ? `"${a}"` : a).join(' ');
-    return childSpawn('powershell.exe', [
-      '-WindowStyle', 'Hidden',
-      '-NonInteractive',
-      '-Command', `& '${command}' ${argStr}`,
-    ], {
+    return childSpawn(command, args, {
       ...options,
       shell: true,
       stdio: 'ignore',
@@ -133,33 +128,15 @@ function spawnHidden(command, args, options) {
   });
 }
 
-// execSync 的隐藏版本 — PowerShell 隐藏窗口 + shell:true 保持进程
+// execSync 的隐藏版本
 async function execHidden(command, timeout = 10000) {
-  return new Promise((resolve) => {
-    const isWin = process.platform === 'win32';
-    let child;
-    if (isWin) {
-      child = childSpawn('powershell.exe', [
-        '-WindowStyle', 'Hidden', '-NonInteractive',
-        '-Command', command,
-      ], { shell: true, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-    } else {
-      child = childSpawn('/bin/sh', ['-c', command], { stdio: ['ignore', 'pipe', 'pipe'] });
-    }
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (d) => { stdout += d; });
-    child.stderr.on('data', (d) => { stderr += d; });
-    const timer = setTimeout(() => { child.kill(); }, timeout);
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      resolve({ stdout, stderr, code: code || 0 });
-    });
-    child.on('error', () => {
-      clearTimeout(timer);
-      resolve({ stdout: '', stderr: '', code: 1 });
-    });
-  });
+  const { execSync } = require('child_process');
+  try {
+    const stdout = execSync(command, { timeout, encoding: 'utf8', stdio: 'pipe', windowsHide: true });
+    return { stdout, stderr: '', code: 0 };
+  } catch (err) {
+    return { stdout: err.stdout || '', stderr: err.stderr || '', code: err.status || 1 };
+  }
 }
 
 // 便携模式日志 — 错误写入U盘
