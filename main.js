@@ -111,8 +111,6 @@ function getCmd(name) {
 function spawnHidden(command, args, options) {
   const isWin = process.platform === 'win32';
   if (isWin) {
-    // Windows: shell: true + windowsHide: true 隐藏窗口
-    // 子进程与父进程同权限，可以被 taskkill 杀掉
     return childSpawn(command, args, {
       ...options,
       shell: true,
@@ -126,6 +124,31 @@ function spawnHidden(command, args, options) {
     shell: false,
     stdio: 'ignore',
     detached: true,
+  });
+}
+
+// execSync 的隐藏版本 — 用 spawn 替代 execSync 避免 CMD 窗口闪现
+async function execHidden(command, timeout = 10000) {
+  return new Promise((resolve) => {
+    const isWin = process.platform === 'win32';
+    const child = childSpawn(
+      isWin ? 'cmd' : '/bin/sh',
+      isWin ? ['/c', command] : ['-c', command],
+      { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }
+    );
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d) => { stdout += d; });
+    child.stderr.on('data', (d) => { stderr += d; });
+    const timer = setTimeout(() => { child.kill(); }, timeout);
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolve({ stdout, stderr, code: code || 0 });
+    });
+    child.on('error', () => {
+      clearTimeout(timer);
+      resolve({ stdout: '', stderr: '', code: 1 });
+    });
   });
 }
 
@@ -250,14 +273,13 @@ ipcMain.handle('gateway-status', async () => {
 });
 
 ipcMain.handle('gateway-stop', async () => {
-  const { execSync } = require('child_process');
   const logger = require('./scripts/logger');
   const cmd = getCmd('openclaw');
   const stopCfg = require('./scripts/config').readConfig();
   const stopPort = stopCfg.gateway?.port || 18789;
   // 先尝试 openclaw 自带的 stop
   try {
-    execSync(`"${cmd}" gateway stop`, { timeout: 10000, stdio: 'pipe', windowsHide: true });
+    await execHidden(`"${cmd}" gateway stop`, 10000);
   } catch {}
   // 等一下看是否停了
   for (let i = 0; i < 6; i++) {
@@ -267,23 +289,23 @@ ipcMain.handle('gateway-stop', async () => {
   // 还没停，用 taskkill 强制杀端口对应的进程
   if (process.platform === 'win32') {
     try {
-      const out = execSync(`netstat -ano | findstr :${stopPort} | findstr LISTENING`, { encoding: 'utf8', timeout: 3000, windowsHide: true });
+      const r = await execHidden(`netstat -ano | findstr :${stopPort} | findstr LISTENING`, 3000);
       const pids = new Set();
-      out.trim().split('\n').forEach(line => {
+      r.stdout.trim().split('\n').forEach(line => {
         const parts = line.trim().split(/\s+/);
         const pid = parts[parts.length - 1];
         if (pid && /^\d+$/.test(pid)) pids.add(pid);
       });
       for (const pid of pids) {
         try {
-          execSync(`taskkill /F /PID ${pid}`, { timeout: 5000, windowsHide: true });
+          await execHidden(`taskkill /F /PID ${pid}`, 5000);
           logger.info(`强制杀掉 gateway PID: ${pid}`);
         } catch {}
       }
     } catch {}
   } else {
     try {
-      execSync('pkill -f "openclaw gateway" 2>/dev/null || true', { timeout: 5000 });
+      await execHidden('pkill -f "openclaw gateway" 2>/dev/null || true', 5000);
     } catch {}
   }
   // 最终确认
@@ -421,7 +443,6 @@ ipcMain.handle('self-destruct', async () => {
 });
 
 async function doLaunchOpenclaw() {
-  const { spawn, execSync } = require('child_process');
   const { shell } = require('electron');
   const crypto = require('crypto');
   const logger = require('./scripts/logger');
@@ -482,13 +503,14 @@ async function doLaunchOpenclaw() {
 
     // 注册为系统服务（开机自启动）— 静默失败
     try {
-      execSync(`"${cmd}" gateway install`, { timeout: 10000, stdio: 'pipe', windowsHide: true });
+      await execHidden(`"${cmd}" gateway install`, 10000);
     } catch {}
 
     // macOS: 确保 npm 全局路径在 PATH 中
     if (process.platform !== 'win32') {
       try {
-        const prefix = require('child_process').execSync('npm config get prefix', { encoding: 'utf8', timeout: 5000 }).trim();
+        const r = await execHidden('npm config get prefix', 5000);
+        const prefix = r.stdout.trim();
         const binDir = prefix + '/bin';
         if (!process.env.PATH.includes(binDir) && !process.env.PATH.includes(prefix)) {
           process.env.PATH = binDir + ':' + process.env.PATH;
@@ -501,23 +523,23 @@ async function doLaunchOpenclaw() {
       if (await checkGatewayHealth()) {
         logger.info('Gateway 已在运行，停止后重新启动以确保 token 一致');
       }
-      execSync(`"${cmd}" gateway stop`, { timeout: 10000, stdio: 'pipe', windowsHide: true });
+      await execHidden(`"${cmd}" gateway stop`, 10000);
       for (let i = 0; i < 10; i++) {
         if (!(await checkGatewayHealth())) break;
         await new Promise(r => setTimeout(r, 500));
       }
       // 如果还没停掉，用 taskkill 强杀
       if (await checkGatewayHealth() && process.platform === 'win32') {
-        const out = execSync('netstat -ano | findstr :18789 | findstr LISTENING', { encoding: 'utf8', timeout: 3000, windowsHide: true });
+        const r = await execHidden('netstat -ano | findstr :18789 | findstr LISTENING', 3000);
         const pids = new Set();
-        out.trim().split('\n').forEach(line => {
+        r.stdout.trim().split('\n').forEach(line => {
           const parts = line.trim().split(/\s+/);
           const pid = parts[parts.length - 1];
           if (pid && /^\d+$/.test(pid)) pids.add(pid);
         });
         for (const pid of pids) {
           try {
-            execSync(`taskkill /F /PID ${pid}`, { timeout: 5000, windowsHide: true });
+            await execHidden(`taskkill /F /PID ${pid}`, 5000);
             logger.info(`强制杀掉 gateway PID: ${pid}`);
           } catch {}
         }
@@ -529,13 +551,13 @@ async function doLaunchOpenclaw() {
     let portInUse = false;
     if (process.platform === 'win32') {
       try {
-        const out = execSync('netstat -ano | findstr :18789 | findstr LISTENING', { encoding: 'utf8', timeout: 3000, windowsHide: true });
-        if (out.trim()) portInUse = true;
+        const r = await execHidden('netstat -ano | findstr :18789 | findstr LISTENING', 3000);
+        if (r.stdout.trim()) portInUse = true;
       } catch {}
     } else {
       try {
-        const out = execSync('lsof -ti:18789', { encoding: 'utf8', timeout: 3000, windowsHide: true }).trim();
-        if (out) portInUse = true;
+        const r = await execHidden('lsof -ti:18789', 3000);
+        if (r.stdout.trim()) portInUse = true;
       } catch {}
     }
 
