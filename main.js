@@ -479,13 +479,17 @@ ipcMain.handle('launch-openclaw', async (event) => {
     logger.info(`复用已有 gateway token: ${token.substring(0, 8)}...`);
   }
 
-  // 将 token 写入 openclaw.json（gateway 从配置文件读取，不依赖 --token 参数）
+  // 将 token 写入 openclaw.json（仅在变化时写入，避免触发 gateway 热重载重启）
   const cfg = config.readConfig();
   if (!cfg.gateway) cfg.gateway = {};
   if (!cfg.gateway.auth) cfg.gateway.auth = {};
-  cfg.gateway.auth.token = token;
-  config.writeConfig(cfg);
-  logger.info(`Token 已写入 openclaw.json: ${token.substring(0, 8)}...`);
+  if (cfg.gateway.auth.token !== token) {
+    cfg.gateway.auth.token = token;
+    config.writeConfig(cfg);
+    logger.info(`Token 已写入 openclaw.json: ${token.substring(0, 8)}...`);
+  } else {
+    logger.info(`Token 未变化，跳过写入`);
+  }
 
   // 打开 Dashboard
   const openDashboard = async (port) => {
@@ -563,11 +567,13 @@ ipcMain.handle('launch-openclaw', async (event) => {
       // 端口被占用（可能是 AutoClaw 或其他 gateway），直接用 18790
       gatewayPort = 18790;
       logger.info(`端口 18789 被占用，使用 ${gatewayPort}`);
-      // 持久化端口到 openclaw.json
+      // 持久化端口到 openclaw.json（仅在变化时写入）
       const portCfg = config.readConfig();
       if (!portCfg.gateway) portCfg.gateway = {};
-      portCfg.gateway.port = gatewayPort;
-      config.writeConfig(portCfg);
+      if (portCfg.gateway.port !== gatewayPort) {
+        portCfg.gateway.port = gatewayPort;
+        config.writeConfig(portCfg);
+      }
       const child = spawnHidden(cmd, ['gateway', 'run', '--allow-unconfigured', '--port', String(gatewayPort)], {
         env: { ...process.env },
       });
@@ -609,11 +615,13 @@ ipcMain.handle('launch-openclaw', async (event) => {
       if (!ready) {
         return { success: false, error: 'Gateway 启动超时，请稍后重试' };
       }
-      // 持久化端口到 openclaw.json
+      // 持久化端口到 openclaw.json（仅在变化时写入）
       const portCfg = config.readConfig();
       if (!portCfg.gateway) portCfg.gateway = {};
-      portCfg.gateway.port = gatewayPort;
-      config.writeConfig(portCfg);
+      if (portCfg.gateway.port !== gatewayPort) {
+        portCfg.gateway.port = gatewayPort;
+        config.writeConfig(portCfg);
+      }
     }
 
     await openDashboard(gatewayPort);
