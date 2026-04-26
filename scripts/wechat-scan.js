@@ -110,13 +110,26 @@ async function installWeixinPlugin() {
     }
   }
 
-  // 启用插件
+  // 启用插件 — 等一下让 npm 文件写入完成，再读最新配置
+  await new Promise(r => setTimeout(r, 1000));
   const cfg2 = config.readConfig();
   if (!cfg2.plugins) cfg2.plugins = {};
   if (!cfg2.plugins.entries) cfg2.plugins.entries = {};
   cfg2.plugins.entries['openclaw-weixin'] = { enabled: true };
   config.writeConfig(cfg2);
-  logger.info('微信插件已启用');
+
+  // 验证写入成功
+  const cfg3 = config.readConfig();
+  if (cfg3.plugins?.entries?.['openclaw-weixin']?.enabled) {
+    logger.info('微信插件已启用并验证');
+  } else {
+    logger.warn('微信插件启用写入可能被覆盖，重试...');
+    cfg3.plugins = cfg3.plugins || {};
+    cfg3.plugins.entries = cfg3.plugins.entries || {};
+    cfg3.plugins.entries['openclaw-weixin'] = { enabled: true };
+    config.writeConfig(cfg3);
+    logger.info('微信插件启用重试完成');
+  }
 }
 
 // 检查微信是否已配置

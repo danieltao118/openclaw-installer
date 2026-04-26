@@ -243,27 +243,31 @@ ipcMain.handle('get-config-status', async (event) => {
 ipcMain.handle('gateway-status', async () => {
   const config = require('./scripts/config');
   const status = config.getConfigStatus();
-  const running = await checkGatewayHealth();
-  return { running, model: status.model, hasApiKey: status.hasApiKey, hasFeishu: status.hasFeishu, hasWeixin: status.hasWeixin };
+  const cfg = config.readConfig();
+  const port = cfg.gateway?.port || 18789;
+  const running = await checkGatewayHealth(port);
+  return { running, port, model: status.model, hasApiKey: status.hasApiKey, hasFeishu: status.hasFeishu, hasWeixin: status.hasWeixin };
 });
 
 ipcMain.handle('gateway-stop', async () => {
   const { execSync } = require('child_process');
   const logger = require('./scripts/logger');
   const cmd = getCmd('openclaw');
+  const stopCfg = require('./scripts/config').readConfig();
+  const stopPort = stopCfg.gateway?.port || 18789;
   // 先尝试 openclaw 自带的 stop
   try {
     execSync(`"${cmd}" gateway stop`, { timeout: 10000, stdio: 'pipe', windowsHide: true });
   } catch {}
   // 等一下看是否停了
   for (let i = 0; i < 6; i++) {
-    if (!(await checkGatewayHealth())) return { success: true };
+    if (!(await checkGatewayHealth(stopPort))) return { success: true };
     await new Promise(r => setTimeout(r, 500));
   }
   // 还没停，用 taskkill 强制杀端口对应的进程
   if (process.platform === 'win32') {
     try {
-      const out = execSync('netstat -ano | findstr :18789 | findstr LISTENING', { encoding: 'utf8', timeout: 3000, windowsHide: true });
+      const out = execSync(`netstat -ano | findstr :${stopPort} | findstr LISTENING`, { encoding: 'utf8', timeout: 3000, windowsHide: true });
       const pids = new Set();
       out.trim().split('\n').forEach(line => {
         const parts = line.trim().split(/\s+/);
@@ -300,19 +304,28 @@ ipcMain.handle('gateway-restart', async () => {
     logger.info('重启：已停止旧 gateway');
   } catch {}
   // 轮询确认旧进程退出（最多 10 秒）
+  const restartCfg = require('./scripts/config').readConfig();
+  const restartPort = restartCfg.gateway?.port || 18789;
   for (let i = 0; i < 20; i++) {
-    if (!(await checkGatewayHealth())) break;
+    if (!(await checkGatewayHealth(restartPort))) break;
     await new Promise(r => setTimeout(r, 500));
   }
   // 如果还活着，强制杀
-  if (await checkGatewayHealth()) {
+  if (await checkGatewayHealth(restartPort)) {
     try {
       if (process.platform === 'win32') {
-        const out = execSync('netstat -ano | findstr :18789 | findstr LISTENING', { encoding: 'utf8', timeout: 3000, windowsHide: true });
-        const pid = out.trim().split(/\s+/).pop();
-        if (pid && /^\d+$/.test(pid)) {
-          execSync(`taskkill /F /PID ${pid}`, { timeout: 5000, windowsHide: true });
-          logger.info(`强制杀掉旧 gateway PID: ${pid}`);
+        const out = execSync(`netstat -ano | findstr :${restartPort} | findstr LISTENING`, { encoding: 'utf8', timeout: 3000, windowsHide: true });
+        const pids = new Set();
+        out.trim().split('\n').forEach(line => {
+          const parts = line.trim().split(/\s+/);
+          const pid = parts[parts.length - 1];
+          if (pid && /^\d+$/.test(pid)) pids.add(pid);
+        });
+        for (const pid of pids) {
+          try {
+            execSync(`taskkill /F /PID ${pid}`, { timeout: 5000, windowsHide: true });
+            logger.info(`强制杀掉旧 gateway PID: ${pid}`);
+          } catch {}
         }
       }
     } catch {}
@@ -323,12 +336,14 @@ ipcMain.handle('gateway-restart', async () => {
 });
 
 ipcMain.handle('get-dashboard-url', async () => {
-  // token 已在 launch-openclaw 中写入 openclaw.json，直接读取
   try {
     const cfg = JSON.parse(fs.readFileSync(path.join(os.homedir(), '.openclaw', 'openclaw.json'), 'utf8'));
-    if (cfg.gateway?.auth?.token) {
-      return `http://127.0.0.1:18789/#token=${encodeURIComponent(cfg.gateway.auth.token)}`;
+    const port = cfg.gateway?.port || 18789;
+    const token = cfg.gateway?.auth?.token;
+    if (token) {
+      return `http://127.0.0.1:${port}/#token=${encodeURIComponent(token)}`;
     }
+    return `http://127.0.0.1:${port}`;
   } catch {}
   return 'http://127.0.0.1:18789';
 });
@@ -548,6 +563,11 @@ ipcMain.handle('launch-openclaw', async (event) => {
       // 端口被占用（可能是 AutoClaw 或其他 gateway），直接用 18790
       gatewayPort = 18790;
       logger.info(`端口 18789 被占用，使用 ${gatewayPort}`);
+      // 持久化端口到 openclaw.json
+      const portCfg = config.readConfig();
+      if (!portCfg.gateway) portCfg.gateway = {};
+      portCfg.gateway.port = gatewayPort;
+      config.writeConfig(portCfg);
       const child = spawnHidden(cmd, ['gateway', 'run', '--allow-unconfigured', '--port', String(gatewayPort)], {
         env: { ...process.env },
       });
@@ -589,6 +609,11 @@ ipcMain.handle('launch-openclaw', async (event) => {
       if (!ready) {
         return { success: false, error: 'Gateway 启动超时，请稍后重试' };
       }
+      // 持久化端口到 openclaw.json
+      const portCfg = config.readConfig();
+      if (!portCfg.gateway) portCfg.gateway = {};
+      portCfg.gateway.port = gatewayPort;
+      config.writeConfig(portCfg);
     }
 
     await openDashboard(gatewayPort);

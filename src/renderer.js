@@ -592,7 +592,7 @@ async function refreshDashboard() {
     if (status.running) {
       dot.className = 'status-dot online';
       text.textContent = 'Gateway 运行中';
-      info.textContent = 'http://127.0.0.1:18789';
+      info.textContent = `http://127.0.0.1:${status.port || 18789}`;
     } else {
       dot.className = 'status-dot offline';
       text.textContent = 'Gateway 未运行';
