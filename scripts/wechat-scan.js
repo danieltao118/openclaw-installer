@@ -93,7 +93,11 @@ async function installWeixinPlugin() {
   }
 
   try {
-    execSync(`"${cmd}" plugins install "@tencent-weixin/openclaw-weixin" --registry=https://registry.npmmirror.com`, {
+    execSync(`"${cmd}" plugins install "@tencent-weixin/openclaw-weixin"`, {
+      timeout: 180000,
+      stdio: 'pipe',
+      windowsHide: true,
+      env: { ...process.env, npm_config_registry: 'https://registry.npmmirror.com' },
       timeout: 180000,
       stdio: 'pipe',
       windowsHide: true,
