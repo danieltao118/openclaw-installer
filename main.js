@@ -246,7 +246,7 @@ ipcMain.handle('gateway-status', async () => {
   const cfg = config.readConfig();
   const port = cfg.gateway?.port || 18789;
   const running = await checkGatewayHealth(port);
-  return { running, port, model: status.model, hasApiKey: status.hasApiKey, hasFeishu: status.hasFeishu, hasWeixin: status.hasWeixin };
+  return { running, port, model: status.model, hasApiKey: status.hasApiKey, hasFeishu: status.hasFeishu };
 });
 
 ipcMain.handle('gateway-stop', async () => {
@@ -681,67 +681,6 @@ ipcMain.handle('feishu-scan-poll', async (event, deviceCode, interval, expireIn)
     return result;
   } catch (err) {
     logger.error(`飞书扫码轮询失败: ${err.message}`);
-    return { status: 'error', message: err.message };
-  }
-});
-
-// 微信扫码登录 IPC
-ipcMain.handle('wechat-plugin-install', async () => {
-  const logger = require('./scripts/logger');
-  try {
-    const wechat = require('./scripts/wechat-scan');
-    await wechat.installWeixinPlugin();
-    logger.info('微信插件安装完成');
-    return { success: true };
-  } catch (err) {
-    logger.error(`微信插件安装失败: ${err.message}`);
-    return { success: false, error: err.message };
-  }
-});
-
-ipcMain.handle('wechat-scan-init', async () => {
-  const logger = require('./scripts/logger');
-  try {
-    const wechat = require('./scripts/wechat-scan');
-    const QR = require('qrcode');
-    const resp = await wechat.fetchQRCode();
-    logger.info(`微信 QR 获取成功, content 长度: ${resp.qrcode_img_content?.length || 0}`);
-
-    // 将 QR URL 转为 base64 图片
-    const qrDataUrl = await QR.toDataURL(resp.qrcode_img_content, { width: 256, margin: 2 });
-    return { success: true, qrImage: qrDataUrl, qrcode: resp.qrcode };
-  } catch (err) {
-    logger.error(`微信 QR 获取失败: ${err.message}`);
-    return { success: false, error: err.message };
-  }
-});
-
-ipcMain.handle('wechat-scan-poll', async (event, qrcode) => {
-  const logger = require('./scripts/logger');
-  try {
-    const wechat = require('./scripts/wechat-scan');
-    const statusResp = await wechat.pollQRStatus(qrcode);
-    logger.info(`微信扫码状态: ${statusResp.status}`);
-
-    if (statusResp.status === 'confirmed' && statusResp.bot_token && statusResp.ilink_bot_id) {
-      // 保存凭证
-      wechat.saveWeixinAccount(
-        statusResp.ilink_bot_id,
-        statusResp.bot_token,
-        statusResp.baseurl,
-        statusResp.ilink_user_id,
-      );
-      return { status: 'confirmed', accountId: statusResp.ilink_bot_id };
-    }
-
-    // 过期时需要刷新 QR
-    if (statusResp.status === 'expired') {
-      return { status: 'expired' };
-    }
-
-    return { status: statusResp.status };
-  } catch (err) {
-    logger.error(`微信扫码轮询失败: ${err.message}`);
     return { status: 'error', message: err.message };
   }
 });

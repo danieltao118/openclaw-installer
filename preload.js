@@ -30,10 +30,6 @@ contextBridge.exposeInMainWorld('installerAPI', {
   getVersions: () => ipcRenderer.invoke('get-versions'),
   loginFeishuChannel: () => ipcRenderer.invoke('feishu-scan-init'),
   feishuScanPoll: (deviceCode, interval, expireIn) => ipcRenderer.invoke('feishu-scan-poll', deviceCode, interval, expireIn),
-  // 微信通道
-  installWeixinPlugin: () => ipcRenderer.invoke('wechat-plugin-install'),
-  wechatScanInit: () => ipcRenderer.invoke('wechat-scan-init'),
-  wechatScanPoll: (qrcode) => ipcRenderer.invoke('wechat-scan-poll', qrcode),
   openLogFile: () => ipcRenderer.invoke('open-log-file'),
   // 反馈相关
   getSystemInfo: () => ipcRenderer.invoke('get-system-info'),

@@ -137,7 +137,6 @@
           <button class="config-tab" data-tab="tab-dashboard">控制面板</button>
           <button class="config-tab active" data-tab="tab-model">AI模型</button>
           <button class="config-tab" data-tab="tab-channel">飞书通道</button>
-          <button class="config-tab" data-tab="tab-wechat">微信通道</button>
           <button class="config-tab" data-tab="tab-done">完成</button>
         </div>
 
@@ -167,14 +166,6 @@
             </div>
             <p class="dashboard-info" id="feishu-status-info"></p>
             <button class="btn btn-link" id="btn-reconfig-feishu">配置飞书通道 →</button>
-          </div>
-          <div class="dashboard-card">
-            <div class="status-row">
-              <span class="status-dot offline" id="wechat-status-dot"></span>
-              <span id="wechat-status-text">检测中...</span>
-            </div>
-            <p class="dashboard-info" id="wechat-status-info"></p>
-            <button class="btn btn-link" id="btn-reconfig-wechat">配置微信通道 →</button>
           </div>
           <div class="btn-row dashboard-actions">
             <button class="btn btn-primary" id="btn-open-webui">打开 WebUI</button>
@@ -297,56 +288,6 @@
           <div class="btn-row" id="feishu-bottom-actions">
             <button class="btn btn-secondary" id="btn-back-model">← 返回</button>
             <button class="btn btn-primary" id="btn-skip-channel">完成配置 →</button>
-          </div>
-        </div>
-
-        <!-- Tab: 微信通道 -->
-        <div id="tab-wechat" class="config-panel">
-          <div class="channel-info">
-            <h3>💬 连接微信通道</h3>
-            <p>通过微信扫码连接您的 AI 助手，扫码后即可在微信中与机器人对话。</p>
-          </div>
-
-          <div id="wechat-scan-area">
-            <div id="wechat-scan-idle" class="scan-state">
-              <div class="scan-illustration">
-                <svg viewBox="0 0 64 64" width="64" height="64" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="4" y="4" width="24" height="24" rx="3"/>
-                  <rect x="36" y="4" width="24" height="24" rx="3"/>
-                  <rect x="4" y="36" width="24" height="24" rx="3"/>
-                  <circle cx="48" cy="48" r="10"/>
-                  <path d="M44 48h8M48 44v8"/>
-                </svg>
-              </div>
-              <p class="scan-desc">点击下方按钮开始扫码配置，用微信 App 扫描二维码即可完成连接。</p>
-              <button class="btn btn-primary btn-scan" id="btn-scan-wechat">扫码配置微信</button>
-              <p class="scan-hint" style="margin-top:8px;color:#888;font-size:0.85em;">首次使用需安装微信插件，请确保网络畅通</p>
-            </div>
-
-            <div id="wechat-scan-running" class="scan-state hidden">
-              <p class="scan-status" id="wechat-scan-status">正在生成二维码...</p>
-              <div class="scan-qr-container" id="wechat-qr-container">
-                <p style="color: #666; font-size: 13px;">正在生成二维码...</p>
-              </div>
-              <p class="scan-hint">请用微信 App 扫描上方二维码</p>
-              <p class="scan-hint" id="wechat-countdown"></p>
-            </div>
-
-            <div id="wechat-scan-success" class="scan-state hidden">
-              <div class="scan-success-icon">✅</div>
-              <p class="scan-status-success">微信通道配置成功！</p>
-            </div>
-
-            <div id="wechat-scan-error" class="scan-state hidden">
-              <div class="scan-error-icon">⚠️</div>
-              <p class="scan-status-error" id="wechat-error-msg">扫码配置失败</p>
-              <button class="btn btn-secondary btn-sm" id="btn-retry-wechat-scan">重试</button>
-            </div>
-          </div>
-
-          <div class="btn-row" id="wechat-bottom-actions">
-            <button class="btn btn-secondary" id="btn-back-feishu">← 返回飞书通道</button>
-            <button class="btn btn-primary" id="btn-skip-wechat">完成配置 →</button>
           </div>
         </div>
 

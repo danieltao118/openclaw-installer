@@ -98,9 +98,6 @@ async function installWeixinPlugin() {
       stdio: 'pipe',
       windowsHide: true,
       env: { ...process.env, npm_config_registry: 'https://registry.npmmirror.com' },
-      timeout: 180000,
-      stdio: 'pipe',
-      windowsHide: true,
     });
     logger.info('微信插件安装成功');
   } catch (err) {
@@ -169,7 +166,7 @@ function saveWeixinAccount(accountId, botToken, baseUrl, userId) {
   fs.writeFileSync(path.join(accountsDir, `${accountId}.json`), JSON.stringify(data, null, 2), 'utf-8');
   logger.info(`微信账号凭证已保存: ${accountId}`);
 
-  // 注册账号 ID
+  // 注册账号 ID（索引文件在 state/openclaw-weixin/accounts.json，插件从这里读取）
   const indexPath = path.join(accountsDir, '..', 'accounts.json');
   let index = [];
   try {

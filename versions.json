@@ -1,6 +1,6 @@
 {
   "node": "22.22.2",
-  "openclaw": "2026.4.15",
+  "openclaw": "2026.4.23",
   "git": "2.49.0",
-  "installer": "1.2.1"
+  "installer": "1.2.2"
 }

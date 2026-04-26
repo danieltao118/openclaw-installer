@@ -353,7 +353,6 @@ function getConfigStatus() {
 
   let hasApiKey = false;
   let hasFeishu = false;
-  let hasWeixin = false;
 
   if (fs.existsSync(envFile)) {
     const envContent = fs.readFileSync(envFile, 'utf8');
@@ -364,26 +363,10 @@ function getConfigStatus() {
     hasFeishu = true;
   }
 
-  if (config.plugins?.entries?.['openclaw-weixin']?.enabled) {
-    // 插件启用了，还要检查是否有真实的账号凭证（扫码登录后才有）
-    const weixinStateDir = path.join(OPENCLAW_DIR, 'state', 'openclaw-weixin', 'accounts');
-    const weixinLegacyDir = path.join(OPENCLAW_DIR, 'credentials', 'openclaw-weixin');
-    try {
-      if (fs.existsSync(weixinStateDir)) {
-        const accounts = fs.readdirSync(weixinStateDir).filter(f => f.endsWith('.json') && f !== 'accounts.json');
-        if (accounts.length > 0) hasWeixin = true;
-      }
-      if (!hasWeixin && fs.existsSync(path.join(weixinLegacyDir, 'credentials.json'))) {
-        hasWeixin = true;
-      }
-    } catch {}
-  }
-
   return {
     hasConfig: fs.existsSync(CONFIG_FILE),
     hasApiKey,
     hasFeishu,
-    hasWeixin,
     model: config.agents?.defaults?.model?.primary || '未设置',
   };
 }
