@@ -53,7 +53,7 @@ if [ -f "openclaw.tgz" ]; then
     sudo npm install -g openclaw.tgz 2>&1
 else
     echo "  openclaw.tgz not found, installing from registry..."
-    sudo npm install -g openclaw@2026.4.15 --registry=https://registry.npmmirror.com 2>&1
+    sudo npm install -g openclaw@2026.4.23 --registry=https://registry.npmmirror.com 2>&1
 fi
 if [ $? -ne 0 ]; then
     echo "  [ERROR] OpenClaw install failed."

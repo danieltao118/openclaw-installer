@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <!-- 金色渐变 -->
+    <radialGradient id="goldGradient" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" style="stop-color:#fff8dc"/>
+      <stop offset="30%" style="stop-color:#ffd700"/>
+      <stop offset="70%" style="stop-color:#ff8c00"/>
+      <stop offset="100%" style="stop-color:#ff6b35"/>
+    </radialGradient>
+    
+    <!-- 发光滤镜 -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- 呼吸动画 -->
+    <style>
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+      }
+      
+      @keyframes rotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+      }
+      
+      @keyframes blink {
+        0%, 90%, 100% { opacity: 1; }
+        95% { opacity: 0.3; }
+      }
+      
+      @keyframes glow {
+        0%, 100% { filter: url(#glow); }
+        50% { filter: url(#glow) brightness(1.2); }
+      }
+      
+      .body {
+        animation: pulse 2s ease-in-out infinite, glow 3s ease-in-out infinite;
+        transform-origin: center;
+      }
+      
+      .orbit-outer {
+        animation: rotate 4s linear infinite;
+        transform-origin: 50px 50px;
+      }
+      
+      .orbit-inner {
+        animation: rotate 3s linear infinite reverse;
+        transform-origin: 50px 50px;
+      }
+      
+      .particle {
+        animation: float 3s ease-in-out infinite;
+      }
+      
+      .particle:nth-child(2) { animation-delay: 0.5s; }
+      .particle:nth-child(3) { animation-delay: 1s; }
+      
+      .eyes {
+        animation: blink 4s ease-in-out infinite;
+      }
+    </style>
+  </defs>
+  
+  <!-- 外轨道 -->
+  <g class="orbit-outer">
+    <ellipse cx="50" cy="50" rx="45" ry="15" 
+             fill="none" stroke="#ffd700" stroke-width="1" stroke-opacity="0.3"/>
+  </g>
+  
+  <!-- 内轨道 -->
+  <g class="orbit-inner">
+    <ellipse cx="50" cy="50" rx="35" ry="12" 
+             fill="none" stroke="#ff8c00" stroke-width="1.5" stroke-opacity="0.4"/>
+  </g>
+  
+  <!-- 主体 -->
+  <g class="body">
+    <circle cx="50" cy="50" r="30" fill="url(#goldGradient)" filter="url(#glow)"/>
+    
+    <!-- 高光 -->
+    <ellipse cx="42" cy="38" rx="10" ry="8" fill="rgba(255,255,255,0.4)"/>
+    
+    <!-- 眼睛 -->
+    <g class="eyes">
+      <circle cx="42" cy="48" r="4" fill="#333"/>
+      <circle cx="43" cy="47" r="1.5" fill="white"/>
+      
+      <circle cx="58" cy="48" r="4" fill="#333"/>
+      <circle cx="59" cy="47" r="1.5" fill="white"/>
+    </g>
+    
+    <!-- 微笑 -->
+    <path d="M 45 56 Q 50 60 55 56" fill="none" stroke="#333" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  
+  <!-- 粒子 -->
+  <g class="particle">
+    <circle cx="20" cy="30" r="3" fill="#ffd700" filter="url(#glow)"/>
+  </g>
+  
+  <g class="particle">
+    <circle cx="80" cy="70" r="2.5" fill="#ff8c00" filter="url(#glow)"/>
+  </g>
+  
+  <g class="particle">
+    <circle cx="75" cy="25" r="2" fill="#ffd700" filter="url(#glow)"/>
+  </g>
+</svg>

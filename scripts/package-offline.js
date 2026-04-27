@@ -6,7 +6,7 @@ const https = require('https');
 const { execSync } = require('child_process');
 
 const NODE_VERSION = '22.22.2';
-const OPENCLAW_VERSION = '2026.4.15';
+const OPENCLAW_VERSION = '2026.4.23';
 const NPM_MIRROR = 'https://registry.npmmirror.com';
 
 const PROJECT_ROOT = path.join(__dirname, '..');

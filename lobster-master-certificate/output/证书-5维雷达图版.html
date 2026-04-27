@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      width: 794px;
+      height: 1123px;
+      background: #0A1628;
+      font-family: "Inter", "SF Pro Display", sans-serif;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    /* 底图 */
+    .bg-image {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.9;
+    }
+    
+    /* 内容层 */
+    .content {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 50px 60px;
+      z-index: 10;
+    }
+    
+    /* 龙虾精灵 - 缩小 */
+    .sprite-container {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 15px;
+    }
+    
+    /* 标题 - 缩小 */
+    .title {
+      font-size: 28px;
+      font-weight: 800;
+      color: #FF6B35;
+      letter-spacing: 3px;
+      margin-bottom: 5px;
+      text-shadow: 0 0 15px rgba(255, 107, 53, 0.5);
+    }
+    
+    .title-en {
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.6);
+      letter-spacing: 2px;
+      margin-bottom: 20px;
+    }
+    
+    /* 恭喜 - 缩小 */
+    .congrats {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.9);
+      margin-bottom: 10px;
+    }
+    
+    /* 姓名 - 缩小 */
+    .name {
+      font-size: 30px;
+      font-weight: 800;
+      color: #FFFFFF;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #FF6B35;
+      padding: 0 25px 8px;
+    }
+    
+    /* 描述 - 适中大小 */
+    .description {
+      font-size: 18px;
+      color: rgba(255, 255, 255, 0.9);
+      line-height: 1.6;
+      text-align: center;
+      margin-bottom: 15px;
+      font-weight: 500;
+    }
+    
+    /* 5维雷达图区域 - 缩小 */
+    .radar-container {
+      position: relative;
+      width: 260px;
+      height: 220px;
+      margin-bottom: 15px;
+    }
+    
+    /* 维度标签 */
+    .dimension-label {
+      position: absolute;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 600;
+      text-align: center;
+      white-space: nowrap;
+    }
+    
+    .dim-ai { top: 0; left: 50%; transform: translateX(-50%); }
+    .dim-tool { top: 35%; left: 0; }
+    .dim-content { top: 35%; right: 0; }
+    .dim-execution { bottom: 15%; left: 15%; }
+    .dim-bond { bottom: 15%; right: 15%; }
+    
+    /* 数值 */
+    .dimension-value {
+      position: absolute;
+      font-size: 14px;
+      color: #FF6B35;
+      font-weight: 700;
+    }
+    
+    .val-ai { top: 18%; left: 50%; transform: translateX(-50%); }
+    .val-tool { top: 45%; left: 8%; }
+    .val-content { top: 45%; right: 8%; }
+    .val-execution { bottom: 5%; left: 22%; }
+    .val-bond { bottom: 5%; right: 22%; }
+    
+    /* 底部信息 */
+    .info-row {
+      display: flex;
+      gap: 30px;
+      margin-bottom: 15px;
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+    }
+    
+    .info-item {
+      text-align: center;
+    }
+    
+    .info-label {
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 11px;
+      margin-bottom: 3px;
+    }
+    
+    .info-value {
+      color: #FFFFFF;
+      font-weight: 600;
+    }
+    
+    /* 荣誉称号 */
+    .honor {
+      font-size: 16px;
+      color: #FF6B35;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    
+    /* 认证 */
+    .footer {
+      text-align: center;
+      margin-top: auto;
+    }
+    
+    .footer-text {
+      font-size: 14px;
+      color: #FFFFFF;
+      font-weight: 700;
+    }
+    
+    .footer-sub {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+    
+    /* 证书编号 */
+    .cert-no {
+      position: absolute;
+      bottom: 25px;
+      right: 40px;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <img src="证书底图-即梦-v2.png" class="bg-image" alt="bg">
+  
+  <div class="content">
+    <!-- 龙虾精灵 -->
+    <div class="sprite-container">
+      <svg viewBox="0 0 120 120" width="100%" height="100%">
+        <defs>
+          <radialGradient id="body-gradient" cx="40%" cy="30%" r="70%">
+            <stop offset="0%" stop-color="#FF8C42"/>
+            <stop offset="40%" stop-color="#FF6B35"/>
+            <stop offset="100%" stop-color="#E55A2B"/>
+          </radialGradient>
+          <filter id="soft-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        
+        <!-- 左大螯 -->
+        <path d="M18 38 C5 35 2 45 8 55 C14 65 22 58 26 48 C28 42 24 38 18 38Z" fill="url(#body-gradient)"/>
+        
+        <!-- 右大螯 -->
+        <path d="M102 38 C115 35 118 45 112 55 C106 65 98 58 94 48 C92 42 96 38 102 38Z" fill="url(#body-gradient)"/>
+        
+        <!-- 左脚 -->
+        <circle cx="42" cy="98" r="7" fill="url(#body-gradient)"/>
+        
+        <!-- 右脚 -->
+        <circle cx="78" cy="98" r="7" fill="url(#body-gradient)"/>
+        
+        <!-- 主身体 -->
+        <circle cx="60" cy="55" r="42" fill="url(#body-gradient)" filter="url(#soft-glow)"/>
+        
+        <!-- 高光 -->
+        <ellipse cx="48" cy="35" rx="12" ry="8" fill="rgba(255,255,255,0.25)"/>
+        
+        <!-- 触须 -->
+        <path d="M45 18 Q38 10 35 12" stroke="#FF8C42" stroke-width="2" stroke-linecap="round" fill="none"/>
+        <path d="M75 18 Q82 10 85 12" stroke="#FF8C42" stroke-width="2" stroke-linecap="round" fill="none"/>
+        
+        <!-- 眼睛 -->
+        <circle cx="48" cy="48" r="5" fill="#4A3728"/>
+        <circle cx="72" cy="48" r="5" fill="#4A3728"/>
+        <circle cx="50" cy="46" r="2" fill="#FFD4A3"/>
+        <circle cx="74" cy="46" r="2" fill="#FFD4A3"/>
+        
+        <!-- 微笑 -->
+        <path d="M 52 58 Q 60 64 68 58" fill="none" stroke="#4A3728" stroke-width="2.5" stroke-linecap="round"/>
+        
+        <!-- 腮红 -->
+        <ellipse cx="38" cy="55" rx="10" ry="6" fill="rgba(255,182,193,0.4)"/>
+        <ellipse cx="82" cy="55" rx="10" ry="6" fill="rgba(255,182,193,0.4)"/>
+      </svg>
+    </div>
+    
+    <!-- 标题 -->
+    <div class="title">龙虾驯养师认证</div>
+    <div class="title-en">LOBSTER MASTER CERTIFICATE</div>
+    
+    <!-- 恭喜 -->
+    <div class="congrats">恭喜伟大的</div>
+    
+    <!-- 姓名 -->
+    <div class="name">【学员姓名】</div>
+    
+    <!-- 描述 -->
+    <div class="description">
+      在3天AI教培实战营中<br>
+      成功驯养一只强大的数字龙虾
+    </div>
+    
+    <!-- 5维雷达图 -->
+    <div class="radar-container">
+      <svg viewBox="0 0 320 280" width="100%" height="100%">
+        <defs>
+          <radialGradient id="radar-gradient" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#FF6B35" stop-opacity="0.3"/>
+            <stop offset="100%" stop-color="#FF6B35" stop-opacity="0.1"/>
+          </radialGradient>
+        </defs>
+        
+        <!-- 背景网格 -->
+        <polygon points="160,40 250,110 220,210 100,210 70,110" fill="none" stroke="rgba(255,107,53,0.2)" stroke-width="1"/>
+        <polygon points="160,70 220,115 200,180 120,180 100,115" fill="none" stroke="rgba(255,107,53,0.15)" stroke-width="1"/>
+        <polygon points="160,100 190,120 180,150 140,150 130,120" fill="none" stroke="rgba(255,107,53,0.1)" stroke-width="1"/>
+        
+        <!-- 轴线 -->
+        <line x1="160" y1="140" x2="160" y2="40" stroke="rgba(255,107,53,0.3)" stroke-width="1"/>
+        <line x1="160" y1="140" x2="250" y2="110" stroke="rgba(255,107,53,0.3)" stroke

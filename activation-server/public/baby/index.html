@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>虾宝出生证明 - 教培AI实战营</title>
+  <link rel="stylesheet" href="baby.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 浮动粒子背景 -->
+    <canvas id="particles-bg"></canvas>
+
+    <!-- 光晕背景 -->
+    <div class="bg-glow">
+      <div class="glow glow-1"></div>
+      <div class="glow glow-2"></div>
+      <div class="glow glow-3"></div>
+    </div>
+
+    <!-- Step 1: 介绍页 -->
+    <div id="step-intro" class="step active">
+      <div class="card">
+        <div class="shrimp-mascot">
+          <img src="assets/male.png" alt="虾宝" class="mascot-img" id="intro-mascot">
+        </div>
+        <h1 class="title-intro">
+          <span class="title-gradient">虾宝孵化中心</span>
+        </h1>
+        <div class="typewriter-box">
+          <p class="typewriter-text" id="typewriter-text"></p>
+          <span class="typewriter-cursor">|</span>
+        </div>
+        <p class="intro-hint">给 AI 虾宝起个名字，领取专属出生证明吧</p>
+        <button class="btn btn-primary" id="btn-start">开始领养</button>
+      </div>
+    </div>
+
+    <!-- Step 2: 填写表单 -->
+    <div id="step-form" class="step">
+      <div class="card">
+        <div class="mini-shrimp">
+          <img src="assets/male.png" alt="虾宝" class="mini-shrimp-img" id="form-mascot">
+        </div>
+        <h2>给你的虾宝取个名字</h2>
+
+        <div class="form-group">
+          <label for="baby-name">虾宝名称</label>
+          <input type="text" id="baby-name" class="form-input" placeholder="输入2-8个字的名字" maxlength="8" autocomplete="off">
+          <p class="form-hint" id="name-hint">请输入虾宝的名称</p>
+        </div>
+
+        <div class="form-group">
+          <label>虾宝性别</label>
+          <div class="gender-cards">
+            <div class="gender-card" data-gender="male" id="gender-male">
+              <img src="assets/male.png" alt="虾宝弟" class="gender-img">
+              <span class="gender-label">虾宝弟</span>
+            </div>
+            <div class="gender-card" data-gender="female" id="gender-female">
+              <img src="assets/female.png" alt="虾宝妹" class="gender-img">
+              <span class="gender-label">虾宝妹</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="btn-hatch" disabled>孵化虾宝</button>
+      </div>
+    </div>
+
+    <!-- Step 3: 孵化动画 -->
+    <div id="step-hatching" class="step">
+      <div class="hatching-area">
+        <div class="egg-container" id="egg-container">
+          <svg viewBox="0 0 200 260" fill="none" xmlns="http://www.w3.org/2000/svg" width="180" height="240" id="egg-svg">
+            <!-- 蛋 -->
+            <ellipse cx="100" cy="130" rx="75" ry="100" fill="url(#egg-gradient)" id="egg-body"/>
+            <!-- 蛋的阴影 -->
+            <ellipse cx="100" cy="230" rx="60" ry="12" fill="rgba(0,0,0,0.2)"/>
+            <!-- 裂纹（初始隐藏） -->
+            <g id="egg-cracks" opacity="0">
+              <path d="M70 90 L80 110 L65 120 L82 135" stroke="#FFF8DC" stroke-width="3" stroke-linecap="round" fill="none"/>
+              <path d="M120 80 L115 100 L130 115 L118 130" stroke="#FFF8DC" stroke-width="3" stroke-linecap="round" fill="none"/>
+              <path d="M85 60 L95 80 L80 85" stroke="#FFF8DC" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+            </g>
+            <!-- 蛋上的光点装饰 -->
+            <circle cx="60" cy="95" r="3" fill="rgba(59,130,246,0.25)"/>
+            <circle cx="130" cy="110" r="2.5" fill="rgba(124,58,237,0.2)"/>
+            <circle cx="90" cy="70" r="2" fill="rgba(0,212,255,0.2)"/>
+            <defs>
+              <radialGradient id="egg-gradient" cx="40%" cy="35%">
+                <stop offset="0%" stop-color="#FFFDE7"/>
+                <stop offset="50%" stop-color="#FFF8E1"/>
+                <stop offset="100%" stop-color="#FFE0B2"/>
+              </radialGradient>
+            </defs>
+          </svg>
+        </div>
+        <p class="hatching-text" id="hatching-text">孵化中...</p>
+      </div>
+    </div>
+
+    <!-- Step 4: 出生证明 -->
+    <div id="step-certificate" class="step">
+      <div class="cert-outer">
+        <!-- 科技风背景层 -->
+        <div class="cert-tech-bg"></div>
+        <div class="card certificate-wrapper">
+          <div class="certificate" id="certificate-preview">
+            <!-- 顶部品牌 -->
+            <div class="cert-brand">教培AI实战营 · OpenClaw</div>
+
+            <!-- 标题区 -->
+            <div class="cert-header">
+              <h3 class="cert-title">虾宝出生证明</h3>
+              <div class="cert-subtitle">SHRIMP BABY BIRTH CERTIFICATE</div>
+            </div>
+
+            <!-- 核心内容：左图右信息 -->
+            <div class="cert-main">
+              <!-- 左侧虾宝头像 -->
+              <div class="cert-left">
+                <div class="cert-avatar-ring">
+                  <img src="assets/male.png" alt="虾宝" class="cert-avatar-img" id="cert-avatar-img">
+                </div>
+                <div class="cert-avatar-name" id="cert-name-display">—</div>
+              </div>
+
+              <!-- 右侧信息 -->
+              <div class="cert-right">
+                <div class="cert-info-item">
+                  <span class="ci-label">持证虾宝</span>
+                  <span class="ci-value" id="cert-name">—</span>
+                </div>
+                <div class="cert-info-item">
+                  <span class="ci-label">性别</span>
+                  <span class="ci-value" id="cert-gender">—</span>
+                </div>
+                <div class="cert-info-item">
+                  <span class="ci-label">出生时间</span>
+                  <span class="ci-value ci-sm" id="cert-date">—</span>
+                </div>
+                <div class="cert-info-item">
+                  <span class="ci-label">出生地点</span>
+                  <span class="ci-value">教培AI实战营</span>
+                </div>
+                <div class="cert-info-item">
+                  <span class="ci-label">专属编号</span>
+                  <span class="ci-value ci-id" id="cert-id">—</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 属性芯片 -->
+            <div class="cert-chips">
+              <div class="cert-chip">
+                <span class="chip-tag" style="background: linear-gradient(135deg, #00d4ff, #0ea5e9)">技能</span>
+                <span class="chip-val" id="attr-skill">—</span>
+              </div>
+              <div class="cert-chip">
+                <span class="chip-tag" style="background: linear-gradient(135deg, #a78bfa, #7c3aed)">性格</span>
+                <span class="chip-val" id="attr-personality">—</span>
+              </div>
+              <div class="cert-chip">
+                <span class="chip-tag" style="background: linear-gradient(135deg, #f472b6, #ec4899)">爱好</span>
+                <span class="chip-val" id="attr-hobby">—</span>
+              </div>
+              <div class="cert-chip">
+                <span class="chip-tag" style="background: linear-gradient(135deg, #fbbf24, #f59e0b)">梦想</span>
+                <span class="chip-val" id="attr-dream">—</span>
+              </div>
+            </div>
+
+            <!-- 底部语 -->
+            <div class="cert-motto">每一只虾宝，都是独一无二的 AI 伙伴</div>
+
+            <!-- 印章 -->
+            <div class="cert-stamp">
+              <div class="stamp-circle">
+                <span class="stamp-text">教培AI实战营</span>
+                <span class="stamp-sub">认证领养</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 操作按钮 -->
+          <div class="cert-actions">
+            <button class="btn btn-save" id="btn-save">保存图片</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 隐藏的 Canvas 用于导出高清图 -->
+    <canvas id="export-canvas" width="1080" height="1920" style="display:none"></canvas>
+  </div>
+
+  <script src="particles.js"></script>
+  <script src="baby.js"></script>
+  <script src="baby-certificate.js"></script>
+</body>
+</html>

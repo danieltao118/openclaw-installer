@@ -8,7 +8,7 @@ const https = require('https');
 // __dirname = tools/, USB_ROOT = 上一级
 const USB_ROOT = path.resolve(__dirname, '..');
 const NODE_VERSION = '22.22.2';
-const OPENCLAW_VERSION = '2026.4.15';
+const OPENCLAW_VERSION = '2026.4.23';
 const REGISTRY = 'https://registry.npmmirror.com';
 
 function log(msg) {

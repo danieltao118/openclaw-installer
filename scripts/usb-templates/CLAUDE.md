@@ -33,7 +33,7 @@
 ### 标准安装
 ```bash
 # Node.js 已装的情况
-npm install -g openclaw@2026.4.15 --registry=https://registry.npmmirror.com
+npm install -g openclaw@2026.4.23 --registry=https://registry.npmmirror.com
 ```
 
 ### 激活码格式

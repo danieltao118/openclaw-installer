@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      width: 794px;
+      height: 1123px;
+      background: linear-gradient(135deg, #E8F4F8 0%, #F0F8FF 50%, #E8F4F8 100%);
+      font-family: "Source Han Sans", "Microsoft YaHei", sans-serif;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    /* 边框装饰 */
+    .border {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      right: 20px;
+      bottom: 20px;
+      border: 3px solid #FF6B35;
+      border-radius: 20px;
+    }
+    
+    .border-inner {
+      position: absolute;
+      top: 30px;
+      left: 30px;
+      right: 30px;
+      bottom: 30px;
+      border: 2px solid #003B5C;
+      border-radius: 15px;
+    }
+    
+    /* 气泡装饰 */
+    .bubble {
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(255, 107, 53, 0.1);
+    }
+    
+    .bubble-1 { width: 60px; height: 60px; top: 80px; left: 60px; }
+    .bubble-2 { width: 40px; height: 40px; top: 120px; left: 100px; }
+    .bubble-3 { width: 50px; height: 50px; bottom: 100px; right: 80px; }
+    .bubble-4 { width: 30px; height: 30px; bottom: 140px; right: 120px; }
+    
+    /* 主内容区 */
+    .content {
+      position: absolute;
+      top: 60px;
+      left: 60px;
+      right: 60px;
+      bottom: 60px;
+      text-align: center;
+    }
+    
+    /* 龙虾精灵图标 */
+    .lobster-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 10px;
+      position: relative;
+    }
+    
+    .lobster-body {
+      width: 60px;
+      height: 50px;
+      background: linear-gradient(135deg, #FF6B35, #FF8C42);
+      border-radius: 50%;
+      position: absolute;
+      top: 15px;
+      left: 10px;
+      box-shadow: 0 4px 8px rgba(255, 107, 53, 0.3);
+    }
+    
+    .lobster-eye {
+      width: 12px;
+      height: 12px;
+      background: white;
+      border-radius: 50%;
+      position: absolute;
+      top: 25px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .lobster-eye.left { left: 20px; }
+    .lobster-eye.right { right: 20px; }
+    
+    .lobster-eye::after {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: #333;
+      border-radius: 50%;
+      position: absolute;
+      top: 3px;
+      left: 3px;
+    }
+    
+    .lobster-smile {
+      width: 20px;
+      height: 10px;
+      border: 3px solid #333;
+      border-top: none;
+      border-radius: 0 0 20px 20px;
+      position: absolute;
+      top: 38px;
+      left: 30px;
+    }
+    
+    .lobster-claw {
+      width: 20px;
+      height: 25px;
+      background: linear-gradient(135deg, #FF6B35, #FF8C42);
+      border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+      position: absolute;
+      top: 20px;
+    }
+    
+    .lobster-claw.left { left: -5px; transform: rotate(-30deg); }
+    .lobster-claw.right { right: -5px; transform: rotate(30deg); }
+    
+    /* 主标题 */
+    .title {
+      font-size: 42px;
+      font-weight: 900;
+      color: #FF6B35;
+      margin-bottom: 5px;
+      letter-spacing: 8px;
+    }
+    
+    /* 英文标题 */
+    .title-en {
+      font-size: 14px;
+      font-weight: 600;
+      color: #003B5C;
+      margin-bottom: 40px;
+      letter-spacing: 3px;
+    }
+    
+    /* 证明文字 */
+    .certify {
+      font-size: 18px;
+      color: #333;
+      margin-bottom: 30px;
+    }
+    
+    /* 学员姓名 */
+    .name {
+      font-size: 48px;
+      font-weight: 900;
+      color: #003B5C;
+      margin-bottom: 30px;
+      border-bottom: 3px solid #FF6B35;
+      display: inline-block;
+      padding: 0 40px 10px;
+    }
+    
+    /* 描述文字 */
+    .description {
+      font-size: 16px;
+      color: #555;
+      line-height: 1.8;
+      margin-bottom: 30px;
+    }
+    
+    /* 能力值区域 */
+    .abilities {
+      background: rgba(255, 107, 53, 0.05);
+      border-radius: 15px;
+      padding: 25px;
+      margin: 0 40px 30px;
+    }
+    
+    .ability-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+      font-size: 16px;
+    }
+    
+    .ability-item:last-child {
+      margin-bottom: 0;
+    }
+    
+    .ability-label {
+      width: 120px;
+      text-align: left;
+      color: #333;
+      font-weight: 600;
+    }
+    
+    .ability-bar {
+      flex: 1;
+      height: 20px;
+      background: #E0E0E0;
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 0 15px;
+    }
+    
+    .ability-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #FF6B35, #FF8C42);
+      border-radius: 10px;
+    }
+    
+    .ability-value {
+      width: 80px;
+      text-align: right;
+      color: #FF6B35;
+      font-weight: 700;
+    }
+    
+    /* 信息区 */
+    .info {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 30px;
+      line-height: 2;
+    }
+    
+    .info-item {
+      display: inline-block;
+      margin: 0 20px;
+    }
+    
+    .info-label {
+      color: #999;
+    }
+    
+    .info-value {
+      color: #003B5C;
+      font-weight: 600;
+    }
+    
+    /* 荣誉称号 */
+    .honor {
+      font-size: 20px;
+      color: #003B5C;
+      font-weight: 700;
+      margin-bottom: 15px;
+    }
+    
+    /* 祝福语 */
+    .wish {
+      font-size: 16px;
+      color: #FF6B35;
+      font-style: italic;
+      margin-bottom: 40px;
+    }
+    
+    /* 日期 */
+    .date {
+      font-size: 16px;
+      color: #666;
+      margin-bottom: 30px;
+    }
+    
+    /* 底部认证 */
+    .footer {
+      position: absolute;
+      bottom: 80px;
+      left: 0;
+      right: 0;
+      text-align: center;
+    }
+    
+    .footer-icon {
+      font-size: 30px;
+      margin-bottom: 10px;
+    }
+    
+    .footer-text {
+      font-size: 14px;
+      color: #003B5C;
+      font-weight: 600;
+    }
+    
+    .footer-sub {
+      font-size: 12px;
+      color: #999;
+      margin-top: 5px;
+    }
+    
+    /* 证书编号 */
+    .cert-no {
+      position: absolute;
+      bottom: 40px;
+      right: 60px;
+      font-size: 12px;
+      color: #999;
+    }
+  </style>
+</head>
+<body>
+  <div class="border"></div>
+  <div class="border-inner"></div>
+  
+  <div class="bubble bubble-1"></div>
+  <div class="bubble bubble-2"></div>
+  <div class="bubble bubble-3"></div>
+  <div class="bubble bubble-4"></div>
+  
+  <div class="content">
+    <div class="lobster-icon">
+    <div class="lobster-claw left"></div>
+    <div class="lobster-claw right"></div>
+    <div class="lobster-body"></div>
+    <div class="lobster-eye left"></div>
+    <div class="lobster-eye right"></div>
+    <div class="lobster-smile"></div>
+  </div>
+    <div class="title">龙虾驯养师认证</div>
+    <div class="title-en">OPENCLAW LOBSTER MASTER CERTIFICATE</div>
+    
+    <div class="certify">兹证明</div>
+    
+    <div class="name">测试学员</div>
+    
+    <div class="description">
+      已成功驯养一只强大的数字龙虾<br>
+      具备独立喂养、训练、升级AI龙虾的能力
+    </div>
+    
+    <div class="abilities">
+      <div class="ability-item">
+        <span class="ability-label">虾的战斗力</span>
+        <div class="ability-bar">
+          <div class="ability-fill" style="width: 66%;"></div>
+        </div>
+        <span class="ability-value">66%</span>
+      </div>
+      <div class="ability-item">
+        <span class="ability-label">虾的智商</span>
+        <div class="ability-bar">
+          <div class="ability-fill" style="width: 74%;"></div>
+        </div>
+        <span class="ability-value">74%</span>
+      </div>
+      <div class="ability-item">
+        <span class="ability-label">虾的忠诚度</span>
+        <div class="ability-bar">
+          <div class="ability-fill" style="width: 100%;"></div>
+        </div>
+        <span class="ability-value">∞</span>
+      </div>
+    </div>
+    
+    <div class="info">
+      <span class="info-item">
+        <span class="info-label">驯养时长：</span>
+        <span class="info-value">3天</span>
+      </span>
+      <span class="info-item">
+        <span class="info-label">龙虾昵称：</span>
+        <span class="info-value">测试虾</span>
+      </span>
+    </div>
+    
+    <div class="honor">特授予「龙虾驯养师」荣誉称号</div>
+    
+    <div class="wish">愿你的虾永远强大，愿你的AI永远听话</div>
+    
+    <div class="date">2026年04月24日</div>
+  </div>
+  
+  <div class="footer">
+    <div class="footer-text">行知商学</div>
+    <div class="footer-sub">教培AI实战营认证</div>
+  </div>
+  
+  <div class="cert-no">证书编号：LOB-20260424-16E3</div>
+</body>
+</html>

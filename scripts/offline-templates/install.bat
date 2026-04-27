@@ -39,17 +39,17 @@ set "PATH=%ProgramFiles%\nodejs;%PATH%"
 
 :: [2/2] 安装 OpenClaw
 echo.
-echo [2/2] 安装 OpenClaw v2026.4.15...
-if exist "%PKG_DIR%openclaw-2026.4.15.tgz" (
-    npm install -g "%PKG_DIR%openclaw-2026.4.15.tgz" --no-audit --no-fund
+echo [2/2] 安装 OpenClaw v2026.4.23...
+if exist "%PKG_DIR%openclaw-2026.4.23.tgz" (
+    npm install -g "%PKG_DIR%openclaw-2026.4.23.tgz" --no-audit --no-fund
     if errorlevel 1 (
         echo [错误] OpenClaw 安装失败，请尝试：
-        echo   npm install -g "%PKG_DIR%openclaw-2026.4.15.tgz"
+        echo   npm install -g "%PKG_DIR%openclaw-2026.4.23.tgz"
         pause & exit /b 1
     )
     echo   OpenClaw 安装完成
 ) else (
-    echo [错误] 未找到 openclaw-2026.4.15.tgz
+    echo [错误] 未找到 openclaw-2026.4.23.tgz
     pause & exit /b 1
 )
 

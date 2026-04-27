@@ -9,7 +9,7 @@ const path = require('path');
 const https = require('https');
 
 const NODE_VERSION = '22.22.2';
-const OPENCLAW_VERSION = '2026.4.15';
+const OPENCLAW_VERSION = '2026.4.23';
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const TEMPLATES = path.join(PROJECT_ROOT, 'scripts', 'usb-templates');
 const BUNDLED = path.join(PROJECT_ROOT, 'bundled');
@@ -104,7 +104,7 @@ if (fs.existsSync(claudeMd)) {
 console.log('\n[6/7] 离线安装包...');
 const bundledFiles = {
   'node-v22.22.2-x64.msi': path.join(drive, 'node.msi'),
-  'openclaw-2026.4.15.tgz': path.join(drive, 'openclaw.tgz'),
+  'openclaw-2026.4.23.tgz': path.join(drive, 'openclaw.tgz'),
 };
 for (const [srcName, dstPath] of Object.entries(bundledFiles)) {
   const src = path.join(BUNDLED, srcName);
@@ -125,7 +125,7 @@ const macFiles = [
   [path.join(TEMPLATES, 'start-claude.command'), path.join(dirs.macos, 'start-claude.command')],
   [path.join(TEMPLATES, 'diagnose-mac.command'), path.join(dirs.macos, 'diagnose-mac.command')],
   [path.join(TEMPLATES, 'launcher-mac.js'), path.join(dirs.macos, 'launcher-mac.js')],
-  [path.join(BUNDLED, 'openclaw-2026.4.15.tgz'), path.join(dirs.macos, 'openclaw.tgz')],
+  [path.join(BUNDLED, 'openclaw-2026.4.23.tgz'), path.join(dirs.macos, 'openclaw.tgz')],
 ];
 for (const [src, dst] of macFiles) {
   if (fs.existsSync(src) && !fs.existsSync(dst)) {

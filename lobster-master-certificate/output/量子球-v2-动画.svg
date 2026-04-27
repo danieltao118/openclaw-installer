@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <!-- 粉红深红渐变 -->
+    <radialGradient id="pinkGradient" cx="30%" cy="30%" r="70%">
+      <stop offset="0%" style="stop-color:#ffb6c1"/>
+      <stop offset="30%" style="stop-color:#ff69b4"/>
+      <stop offset="60%" style="stop-color:#dc143c"/>
+      <stop offset="100%" style="stop-color:#8b0000"/>
+    </radialGradient>
+    
+    <!-- 发光滤镜 -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- 动画 -->
+    <style>
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.03); }
+      }
+      
+      @keyframes rotate {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-3px); }
+      }
+      
+      @keyframes blink {
+        0%, 90%, 100% { transform: scaleY(1); }
+        95% { transform: scaleY(0.1); }
+      }
+      
+      .body-group {
+        animation: pulse 2s ease-in-out infinite;
+        transform-origin: 50px 55px;
+      }
+      
+      .orbit-outer {
+        animation: rotate 4s linear infinite;
+        transform-origin: 50px 50px;
+      }
+      
+      .orbit-inner {
+        animation: rotate 3s linear infinite reverse;
+        transform-origin: 50px 50px;
+      }
+      
+      .particle {
+        animation: float 2.5s ease-in-out infinite;
+      }
+      
+      .eyes {
+        animation: blink 4s ease-in-out infinite;
+        transform-origin: center;
+      }
+    </style>
+  </defs>
+  
+  <!-- 外轨道 -->
+  <g class="orbit-outer">
+    <ellipse cx="50" cy="50" rx="48" ry="12" 
+             fill="none" stroke="#ff69b4" stroke-width="0.8" stroke-opacity="0.3"/>
+  </g>
+  
+  <!-- 内轨道 -->
+  <g class="orbit-inner">
+    <ellipse cx="50" cy="50" rx="38" ry="10" 
+             fill="none" stroke="#dc143c" stroke-width="1" stroke-opacity="0.4"/>
+  </g>
+  
+  <!-- 主体组 -->
+  <g class="body-group">
+    <!-- 左手 -->
+    <ellipse cx="22" cy="58" rx="6" ry="4" fill="#dc143c" transform="rotate(-30 22 58)"/>
+    
+    <!-- 右手 -->
+    <ellipse cx="78" cy="58" rx="6" ry="4" fill="#dc143c" transform="rotate(30 78 58)"/>
+    
+    <!-- 左脚 -->
+    <ellipse cx="38" cy="88" rx="5" ry="3" fill="#8b0000"/>
+    
+    <!-- 右脚 -->
+    <ellipse cx="62" cy="88" rx="5" ry="3" fill="#8b0000"/>
+    
+    <!-- 身体（比例加大） -->
+    <circle cx="50" cy="55" r="35" fill="url(#pinkGradient)" filter="url(#glow)"/>
+    
+    <!-- 高光 -->
+    <ellipse cx="40" cy="40" rx="12" ry="10" fill="rgba(255,255,255,0.35)"/>
+    
+    <!-- 眼睛 -->
+    <g class="eyes">
+      <circle cx="40" cy="52" r="5" fill="#333"/>
+      <circle cx="41.5" cy="50.5" r="2" fill="white"/>
+      
+      <circle cx="60" cy="52" r="5" fill="#333"/>
+      <circle cx="61.5" cy="50.5" r="2" fill="white"/>
+    </g>
+    
+    <!-- 微笑 -->
+    <path d="M 43 62 Q 50 67 57 62" fill="none" stroke="#333" stroke-width="2.5" stroke-linecap="round"/>
+    
+    <!-- 腮红 -->
+    <ellipse cx="30" cy="58" rx="6" ry="3" fill="rgba(255,150,150,0.4)"/>
+    <ellipse cx="70" cy="58" rx="6" ry="3" fill="rgba(255,150,150,0.4)"/>
+  </g>
+  
+  <!-- 粒子 -->
+  <g class="particle">
+    <circle cx="15" cy="25" r="2.5" fill="#ff69b4" filter="url(#glow)"/>
+  </g>
+  
+  <g class="particle" style="animation-delay: 0.5s;">
+    <circle cx="85" cy="75" r="2" fill="#dc143c" filter="url(#glow)"/>
+  </g>
+  
+  <g class="particle" style="animation-delay: 1s;">
+    <circle cx="80" cy="20" r="1.8" fill="#ff69b4" filter="url(#glow)"/>
+  </g>
+</svg>

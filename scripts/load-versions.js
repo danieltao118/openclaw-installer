@@ -17,7 +17,7 @@ function loadVersions() {
       }
     } catch {}
   }
-  return { node: '22.22.2', openclaw: '2026.4.15', installer: '1.0.0' };
+  return { node: '22.22.2', openclaw: '2026.4.23', installer: '1.0.0' };
 }
 
 module.exports = loadVersions();

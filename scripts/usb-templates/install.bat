@@ -48,7 +48,7 @@ if exist "%USB%openclaw.tgz" (
     call npm install -g "%USB%openclaw.tgz" 2>&1
 ) else (
     echo  openclaw.tgz not found on USB, installing from registry...
-    call npm install -g openclaw@2026.4.15 --registry=https://registry.npmmirror.com 2>&1
+    call npm install -g openclaw@2026.4.23 --registry=https://registry.npmmirror.com 2>&1
 )
 if errorlevel 1 (
     echo  [ERROR] OpenClaw install failed.

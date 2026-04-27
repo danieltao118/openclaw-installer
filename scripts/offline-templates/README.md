@@ -41,7 +41,7 @@ node --version
 ### 第二步：安装 OpenClaw
 
 ```bash
-npm install -g openclaw-2026.4.15.tgz
+npm install -g openclaw-2026.4.23.tgz
 ```
 
 验证：
@@ -87,6 +87,6 @@ openclaw gateway start
 | 组件 | 版本 |
 |------|------|
 | Node.js | v22.22.2 LTS |
-| OpenClaw | 2026.4.15 |
+| OpenClaw | 2026.4.23 |
 
 *由行知商学提供 · 教培AI实战营*

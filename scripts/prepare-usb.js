@@ -368,7 +368,7 @@ async function main() {
   }
 
   // openclaw.tgz
-  const oclawSrc = path.join(__dirname, '..', 'bundled', 'openclaw-2026.4.15.tgz');
+  const oclawSrc = path.join(__dirname, '..', 'bundled', 'openclaw-2026.4.23.tgz');
   const oclawDst = path.join(macDir, 'openclaw.tgz');
   if (fs.existsSync(oclawSrc) && !fs.existsSync(oclawDst)) {
     fs.copyFileSync(oclawSrc, oclawDst);

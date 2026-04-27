@@ -3,7 +3,7 @@
 # 使用方式：双击此文件，或在终端中执行 bash install.sh
 
 PKG_DIR="$(cd "$(dirname "$0")" && pwd)"
-OPENCLAW_VERSION="2026.4.15"
+OPENCLAW_VERSION="2026.4.23"
 
 echo ""
 echo "=========================================="

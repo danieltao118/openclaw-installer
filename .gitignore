@@ -4,3 +4,11 @@ bundled/
 *.log
 .DS_Store
 Thumbs.db
+*.tgz
+*.zip
+feedback-dump.json
+activation-server/codes.json
+过程截图展示/
+OpenClaw手动/*.msi
+OpenClaw手动/*.exe
+OpenClaw手动/*.tgz

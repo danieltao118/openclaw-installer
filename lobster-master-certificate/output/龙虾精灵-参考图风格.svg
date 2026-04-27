@@ -1,0 +1,81 @@
+<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 3D渐变 - 顶部亮底部暗 -->
+    <radialGradient id="body-gradient" cx="40%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#FF8C42"/>
+      <stop offset="40%" stop-color="#FF6B35"/>
+      <stop offset="100%" stop-color="#E55A2B"/>
+    </radialGradient>
+    
+    <!-- 腮红渐变 -->
+    <radialGradient id="blush-gradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFB6C1" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#FFB6C1" stop-opacity="0"/>
+    </radialGradient>
+    
+    <!-- 高光 -->
+    <filter id="soft-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <style>
+      @keyframes breathe {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.02); }
+      }
+      
+      @keyframes float {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-3px); }
+      }
+      
+      .whole-body {
+        animation: breathe 3s ease-in-out infinite;
+        transform-origin: 60px 60px;
+      }
+    </style>
+  </defs>
+  
+  <!-- 整体 -->
+  <g class="whole-body">
+    <!-- 左大螯 -->
+    <path d="M18 38 C5 35 2 45 8 55 C14 65 22 58 26 48 C28 42 24 38 18 38Z" fill="url(#body-gradient)"/>
+    
+    <!-- 右大螯 -->
+    <path d="M102 38 C115 35 118 45 112 55 C106 65 98 58 94 48 C92 42 96 38 102 38Z" fill="url(#body-gradient)"/>
+    
+    <!-- 左脚 - 圆润小球 -->
+    <circle cx="42" cy="98" r="7" fill="url(#body-gradient)"/>
+    
+    <!-- 右脚 - 圆润小球 -->
+    <circle cx="78" cy="98" r="7" fill="url(#body-gradient)"/>
+    
+    <!-- 主身体 - 大圆球 -->
+    <circle cx="60" cy="55" r="42" fill="url(#body-gradient)" filter="url(#soft-glow)"/>
+    
+    <!-- 去掉头部白圈 -->
+    
+    <!-- 触须 - 简化 -->
+    <path d="M45 18 Q38 10 35 12" stroke="#FF8C42" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <path d="M75 18 Q82 10 85 12" stroke="#FF8C42" stroke-width="2" stroke-linecap="round" fill="none"/>
+    
+    <!-- 眼睛 - 简单圆点 -->
+    <circle cx="48" cy="48" r="5" fill="#4A3728"/>
+    <circle cx="72" cy="48" r="5" fill="#4A3728"/>
+    
+    <!-- 眼睛高光 - 浅橙色 -->
+    <circle cx="50" cy="46" r="2" fill="#FFD4A3"/>
+    <circle cx="74" cy="46" r="2" fill="#FFD4A3"/>
+    
+    <!-- 微笑 - 弯弯的线 -->
+    <path d="M 52 58 Q 60 64 68 58" fill="none" stroke="#4A3728" stroke-width="2.5" stroke-linecap="round"/>
+    
+    <!-- 腮红 - 柔和红晕 -->
+    <ellipse cx="38" cy="55" rx="10" ry="6" fill="url(#blush-gradient)"/>
+    <ellipse cx="82" cy="55" rx="10" ry="6" fill="url(#blush-gradient)"/>
+  </g>
+</svg>
